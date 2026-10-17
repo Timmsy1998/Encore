@@ -21,6 +21,7 @@ Verified on 2026-10-17. This is a development preview, not a real-account playba
 - Partial settings commands now validate supplied fields without applying defaults to omitted fields. Regression tests cover retaining setup progress, Spotify client ID and unrelated preferences across saves and step navigation, plus empty and invalid updates.
 - Node 24.11.0 on Linux/WSL: TypeScript, lint, all 33 unit/contract tests and production build passed. Nine Chromium UI checks passed. Real Electron smoke entered a client ID in setup, clicked Connect, verified the authorization URL and PKCE method, and confirmed setup progress, volume and client ID survived saving and continuing. Only the external browser launch was intercepted; the renderer, IPC validation and main-process settings/provider code ran normally.
 - Setup and playback documentation now explain Development Mode User Management and adding the Spotify account that will connect. Real-account authorization, audible playback and Windows behaviour remain unverified for this fix.
+- Follow-up real Electron smoke also clicked Streamer.bot Save & connect with a changed port and YouTube Save & test API with a test-only key. Both retained the active setup step and unrelated settings; the YouTube request carried the saved key and received a controlled API response. No real Streamer.bot server or Google account was used.
 
 ## GitHub updater checks
 

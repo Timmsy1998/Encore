@@ -44,6 +44,45 @@ try {
   const state = await window.evaluate(() => window.encore.snapshot());
   if (state.playing || state.current || state.queue.length)
     throw Error("Fresh profile must start empty and paused.");
+  // Streamer.bot saves must retain the active step and unrelated settings.
+  await window.evaluate(() => window.encore.command({
+    type: "settings", settings: { setupStep: 1, volume: 23 },
+  }));
+  await window.getByLabel("WebSocket port").fill("65534");
+  await window.getByRole("button", { name: "Save & connect", exact: true }).click();
+  await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).settings.wsPort)
+    .toBe(65534);
+  expect((await window.evaluate(() => window.encore.snapshot())).settings.setupStep).toBe(1);
+  expect((await window.evaluate(() => window.encore.snapshot())).settings.volume).toBe(23);
+
+  // Use a controlled API response, while the real secret-save/test path runs.
+  await app.evaluate(() => {
+    globalThis.encoreSmokeFetch = globalThis.fetch;
+    globalThis.fetch = async (url, init) => {
+      if (String(url).startsWith("https://www.googleapis.com/youtube/v3/")) {
+        globalThis.encoreSmokeYoutubeKey = new URL(url).searchParams.get("key");
+        return new Response(JSON.stringify({ items: [] }), { status: 200 });
+      }
+      return globalThis.encoreSmokeFetch(url, init);
+    };
+  });
+  try {
+    await window.evaluate(() => window.encore.command({ type: "settings", settings: { setupStep: 3 } }));
+    await window.getByLabel("YouTube API key").fill("encore-smoke-key");
+    await window.getByRole("button", { name: "Save & test API", exact: true }).click();
+    await expect.poll(() => app.evaluate(() => globalThis.encoreSmokeYoutubeKey)).toBe("encore-smoke-key");
+    await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).youtube)
+      .toContain("API verified");
+    expect((await window.evaluate(() => window.encore.snapshot())).settings.setupStep).toBe(3);
+    expect((await window.evaluate(() => window.encore.snapshot())).settings.wsPort).toBe(65534);
+    expect((await window.evaluate(() => window.encore.snapshot())).settings.volume).toBe(23);
+  } finally {
+    await app.evaluate(() => {
+      globalThis.fetch = globalThis.encoreSmokeFetch;
+      delete globalThis.encoreSmokeFetch;
+      delete globalThis.encoreSmokeYoutubeKey;
+    });
+  }
   // Keep authorization local while exercising the real setup and IPC path.
   await app.evaluate(({ shell }) => {
     globalThis.encoreSmokeOpenExternal = shell.openExternal;
@@ -104,7 +143,7 @@ try {
   );
   if (!denied) throw Error("Node unexpectedly exposed in renderer");
   console.log(
-    "Electron startup, preload, empty paused state, Spotify setup/authorization launch, navigation and native clipboard passed.",
+    "Electron startup, preload, empty paused state, Streamer.bot/YouTube/Spotify setup saves, authorization launch, navigation and native clipboard passed.",
   );
 } finally {
   await app.close();
