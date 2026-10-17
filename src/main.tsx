@@ -171,13 +171,6 @@ function App() {
     void send({ type: "settings", settings });
   const open = (target: Extract<Command, { type: "open" }>["target"]) =>
     void send({ type: "open", target });
-  function copy(value: string) {
-    void navigator.clipboard
-      .writeText(value)
-      .catch(() =>
-        setLocalError("Clipboard unavailable. Select and copy the value."),
-      );
-  }
   async function add(e: FormEvent) {
     e.preventDefault();
     if (!input.trim()) return;
@@ -305,7 +298,7 @@ function App() {
             variant="ghost"
             size="icon"
             aria-label="Copy redirect URI"
-            onClick={() => copy("http://127.0.0.1:17843/callback")}
+            onClick={() => send({ type: "copyRedirectUri" })}
           >
             <Copy size={16} />
           </Button>
@@ -386,7 +379,7 @@ function App() {
             variant="ghost"
             size="icon"
             aria-label="Copy overlay URL"
-            onClick={() => copy(s.overlayUrl)}
+            onClick={() => send({ type: "copyOverlayUrl" })}
           >
             <Copy size={16} />
           </Button>

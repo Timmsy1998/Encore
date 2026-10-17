@@ -48,6 +48,21 @@ try {
   await expect(
     window.getByRole("heading", { name: "Request queue" }),
   ).toBeVisible();
+  // Exercise the actual renderer → validated IPC → native clipboard path.
+  const previousClipboard = await app.evaluate(({ clipboard }) => clipboard.readText());
+  try {
+    await window.getByRole("button", { name: "Settings", exact: true }).click();
+    await window.getByRole("button", { name: "Copy redirect URI" }).click();
+    await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
+      .toBe("http://127.0.0.1:17843/callback");
+    await window.getByRole("button", { name: "Overlay", exact: true }).click();
+    await window.getByRole("button", { name: "Copy overlay URL" }).click();
+    await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
+      .toBe("http://127.0.0.1:17843/overlay.html");
+  } finally {
+    await app.evaluate(({ clipboard }, text) => clipboard.writeText(text), previousClipboard);
+  }
+  await window.getByRole("button", { name: "Queue", exact: true }).click();
   await mkdir("test-results", { recursive: true });
   await window.screenshot({ path: "test-results/electron-player.png" });
   const denied = await window.evaluate(
@@ -57,7 +72,7 @@ try {
   );
   if (!denied) throw Error("Node unexpectedly exposed in renderer");
   console.log(
-    "Electron startup, preload, empty paused state and navigation passed.",
+    "Electron startup, preload, empty paused state, navigation and native clipboard passed.",
   );
 } finally {
   await app.close();

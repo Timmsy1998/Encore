@@ -11,6 +11,11 @@ Verified on 2026-10-17. This is a development preview, not a real-account playba
 - Both GitHub workflows passed actionlint 1.7.12 static validation. Hosted GitHub Actions have not run for these local commits.
 - Production dependency audit: zero advisories. Full development-toolchain audit: nine advisories (eight moderate, one high). The unresolved high advisory is in the development archive-extraction chain; runtime archives are pinned and hash-verified before extraction. This is a release-maintenance concern, not a claim that the complete toolchain is vulnerability-free.
 
+## Clipboard fix checks
+
+- Spotify redirect URI and overlay URL copy buttons now use named, validated main-process commands and Electron's native clipboard API. Browser clipboard permissions remain denied.
+- Node 24.11.0 on Linux/WSL: TypeScript, lint, all 31 tests, production build and nine Chromium UI checks passed. Real Electron smoke clicked both copy buttons and verified their exact native clipboard contents. Windows clipboard interaction has not been rechecked locally.
+
 ## GitHub updater checks
 
 - Node 24.11.0 on Linux/WSL: TypeScript, ESLint, all 31 unit/contract tests and production build passed. Updater tests cover stable-only downloads, explicit restart, in-flight deduplication, offline retry, periodic checks and unsupported-copy fallback. Release verification tests reject mismatched installer metadata.

@@ -504,6 +504,12 @@ async function command(c: Command) {
     case "showPlayer":
       showPlayer();
       break;
+    case "copyRedirectUri":
+      clipboard.writeText(origin + "/callback");
+      break;
+    case "copyOverlayUrl":
+      clipboard.writeText(origin + "/overlay.html");
+      break;
     case "copyImport":
       clipboard.writeText(
         readFileSync(join(root, "streamerbot-import.txt"), "utf8"),

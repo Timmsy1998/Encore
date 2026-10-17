@@ -105,6 +105,8 @@ export const CommandSchema = z.discriminatedUnion("type", [
       "overlayTest",
       "diagnostics",
       "copyImport",
+      "copyRedirectUri",
+      "copyOverlayUrl",
       "checkImport",
       "checkUpdates",
       "installUpdate",
