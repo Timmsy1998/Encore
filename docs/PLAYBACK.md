@@ -1,53 +1,58 @@
-# Playback approach
+# Playback
 
-The requested browser-playback direction is implemented using Spotify's official Web Playback SDK and YouTube's official IFrame API, inside one isolated Encore provider view. There is one main-owned queue and common transport. Encore does not control or require an external Spotify app. An iframe-free YouTube audio player is not supported by the official API; Encore retains the visible 320×200 video and controls. YouTube pauses when the app is hidden/minimised; playback restores the window.
+Spotify and YouTube play inside Encore through their official browser players. They share a queue and playback controls; switching services pauses the outgoing player before starting the next song.
 
-## Search preference
+Spotify needs Premium, developer-app access and Widevine DRM. YouTube uses its visible video player and pauses when Encore is hidden or minimised. Reopening Encore always leaves playback paused.
 
-Plain-title requests and personal listening searches try connected Spotify first. If Spotify is disconnected or returns no available track, Encore searches up to 15 YouTube results, preferring artist Topic/auto-generated releases, then official audio, then regular videos. It skips unavailable or untimed videos and retains search relevance order within each tier. Topic channels and “Provided to YouTube by” descriptions are best-effort artist-audio signals; this is not a separate YouTube Music catalogue integration. Search uses the official [Spotify search endpoint](https://developer.spotify.com/documentation/web-api/reference/search) and [YouTube search endpoint](https://developers.google.com/youtube/v3/docs/search/list), with batched video metadata.
+## Connecting Spotify
 
-Explicit Spotify, YouTube and music.youtube.com track links keep their selected track. Playlist imports keep their original order. Authentication, quota and network errors are surfaced rather than silently switching services; reconnect or retry when shown.
+Create a Spotify developer app with Web Playback SDK access. Register this redirect URI exactly:
 
-## Spotify
+```text
+http://127.0.0.1:17843/callback
+```
 
-Create a Spotify developer app with Web Playback SDK access and register the redirect URI below. For Development Mode apps, open the app's **User Management** tab, select **Add new user**, and enter the name and Spotify email address of the account you will connect in Encore. Sign in with that same account when connecting. See Spotify's [Development Mode user access instructions](https://developer.spotify.com/documentation/web-api/concepts/quota-modes). Encore cannot add users to your developer app for you.
+For a Development Mode app, add your Spotify account under **User Management** in the developer dashboard. Enter its Client ID in Encore and connect using that account. You don't need a Client Secret.
 
-[Web Playback SDK](https://developer.spotify.com/documentation/web-playback-sdk) creates the named Encore device. [PKCE](https://developer.spotify.com/documentation/web-api/tutorials/code-pkce-flow) authorization uses the system browser, random state, S256 and a one-use expiring verifier. The exact [loopback redirect](https://developer.spotify.com/documentation/web-api/concepts/redirect_uri) is `http://127.0.0.1:17843/callback`. Main retains refresh tokens; only a scoped access token reaches the isolated SDK page through an authenticated endpoint. Playback commands specify Encore's own SDK device ID and never choose an arbitrary active device.
+Encore creates its own playback device. Wait for **Browser player ready** before playing a song. If login succeeds but playback doesn't start, check Premium, app access and the browser-player error shown in Encore.
 
-Playlist imports use Spotify's current `/playlists/{id}/items` endpoint. In Development Mode, the connected account must own or collaborate on the playlist; following or saving another user's playlist does not grant API access. See the [February 2026 migration guide](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide). Import skips unavailable tracks, local files and episodes and reads up to 1,000 playlist entries. Existing saved base tracks remain intact if import fails.
+Windows packages use Castlabs Electron for Widevine support and need VMP signing. See [release setup](RELEASE.md#signing).
 
-Stock Electron is not assumed to supply Widevine. The runtime downloader pins Castlabs ECS `44.5.1+wvcus` and verifies the release archive hash before extraction. [Castlabs EVS documentation](https://github.com/castlabs/electron-releases/wiki/EVS) requires VMP signing for production Windows/macOS packages. The build hook signs Windows after Authenticode, before archive creation. Linux smoke does not establish Windows DRM support. Spotify's supported-browser list does not name Electron; a successful CDM initialization or account login is not proof of playable audio.
+## Search and imports
 
-Premium, developer-app access/account allowlisting, working Widevine and an SDK `ready` event are required. SDK errors are surfaced and playback paused. Local SDK state sampling every two seconds detects completion without Web API polling. End events carry track/generation identity and are deduplicated by main. Provider changes pause the outgoing source before starting the next.
+Song-and-artist searches use this order:
 
-**Distribution gate:** [Spotify Developer Policy](https://developer.spotify.com/policy) restricts integrating its platform with another service's content and includes restrictions relevant to broadcasting. This source implementation is not evidence of provider approval. Resolve permission and music rights before distributing or broadcasting. Do not represent successful technical playback as permission.
+1. Spotify, when connected.
+2. Artist Topic releases, auto-generated releases and official audio on YouTube.
+3. Other YouTube videos.
 
-## YouTube
+YouTube Music preference is based on YouTube search metadata, rather than a separate Music catalogue connection. Pasted Spotify, YouTube and `music.youtube.com` track links keep the chosen track. Authentication, quota and network errors are shown in the app.
 
-[Official IFrame API](https://developers.google.com/youtube/iframe_api_reference) runs from the fixed HTTP loopback origin in a sandboxed WebContentsView. No downloads, stream extraction, certificate overrides or disabled browser security are used. Preserve origin/Referer and the visible video: [required minimum functionality](https://developers.google.com/youtube/terms/required-minimum-functionality). Autoplay, embedding restrictions, removed videos, live streams and quotas remain provider-controlled. Metadata comes from YouTube Data API v3; a successful API test does not establish playback acceptance.
+Spotify playlist imports use `/playlists/{id}/items`. In Development Mode, the connected account must own or collaborate on the playlist; saving someone else's playlist doesn't grant API access. YouTube imports need a public or unlisted playlist and a Data API key.
 
-Playlist imports require a public or unlisted YouTube playlist and a configured Data API key. Metadata is fetched in batches using [videos.list](https://developers.google.com/youtube/v3/docs/videos/list), preserving playlist order and skipping missing, non-embeddable, live/upcoming and overlong entries. Quota and network errors abort the import and preserve the saved base playlist. The import button shows progress and the result.
+Imports read up to 1,000 entries and skip unavailable or unsupported items. Failed imports leave the saved playlist intact.
 
-## Audio and OBS
+## Mixed playlists
 
-Both providers render audio inside Encore. The silent OBS overlay shows artwork, metadata and provider-reported progress and receives no credentials. Its Album card, Accent glass and Minimal styles are original designs inspired by the artwork-and-timeline treatment of [6K Labs Amuse](https://6klabs.com/amuse). Configure accent/background/text colours, background opacity, width, corner radius, horizontal or vertical gallery layout, compact spacing, artwork, optional spinning vinyl, progress, requester and hiding while paused in Overlay. The in-app preview and OBS use the same renderer; appearance changes apply live without replacing the source URL. Requester attribution is shown only for queued requests, and platform names are omitted. Equalizer bars and vinyl animate during playback and pause with playback. Track changes crossfade without restarting on progress updates; reduced-motion preferences disable animation. Add a 960 × 260 horizontal or 960 × 1100 vertical browser source (transparent background) and resize it in your scene. The test overlay uses an explicitly labelled example song when no track is active. Capture Encore application audio once. Verify transitions, pause, skip, recovery and capture on the actual Windows package, including switching after an expired Spotify session. Do not capture overlay audio or duplicate Desktop Audio.
+Open **Listening → Your playlists** to create a named playlist. Add songs from either service or use **Append playlist** to combine imports. Duplicate provider IDs are skipped.
 
+Choose **Use for stream** to play it whenever requests and personal listening are empty. Reordering, switching, stopping or deleting a stream playlist affects upcoming tracks; the current song finishes normally. The library supports up to 100 playlists with 10,000 songs each and is included in backups.
 
-YouTube starts requested tracks with the official IFrame API's `loadVideoById`, rather than cueing and immediately issuing a separate play command. Resume uses `playVideo` without resetting position; repeated base tracks receive a new track generation and reload from the beginning. Electron's provider view permits autoplay without a new gesture. An `onAutoplayBlocked` callback pauses the queue with a visible retry message. Reopening Encore remains paused. Timeline samples are authenticated, checked against the current track/generation, and never drive queue progression.
+The original **Base playlist** URL import replaces the stream selection. It doesn't delete named playlists. Use **Append playlist** when you want to add an import to an existing saved playlist.
 
-Save independent designs with Add overlay: each copies the selected appearance and receives a stable URL containing an opaque preset ID. Up to 20 saved overlays can coexist with the default overlay, including multiple simultaneous OBS Browser sources. Select a saved overlay to edit its appearance, copy its URL or open its test view. Renaming does not change its URL; deleting makes existing sources for that ID disappear. Existing default URLs and settings keep working, and saved designs are included in state backups.
+## OBS artwork and audio
 
+OBS overlays are silent. Capture Encore's application audio once for both services.
 
-## Canvas artwork
+Each saved overlay has its own design and URL. You can keep the default overlay and add up to 20 more. Renaming preserves a source's URL; deleting hides that source. Styles include Album card, Accent glass and Minimal, inspired by [6K Labs Amuse](https://6klabs.com/amuse).
 
-Enable **Canvas video artwork** independently on any overlay. For a YouTube track, OBS loads a muted official player in a square (at least 200 × 200), retaining the complete video and provider controls; widescreen videos have letterboxing. Use a 960 × 320 horizontal Browser source, or the existing vertical source size. Canvas takes precedence over vinyl for YouTube tracks, follows Encore’s reported playback position and pause state, and never controls the queue. Each source has its own visual player, so multiple Canvas sources require additional video resources. Disable Canvas to keep cover/vinyl art.
+**Canvas video artwork** shows the muted YouTube player in a square, with letterboxing where needed. It follows Encore's playback position and takes precedence over spinning vinyl. Use a 960 × 320 horizontal source, or 960 × 1100 for a vertical gallery. Each Canvas source loads its own video player, so several sources use more resources.
 
-The settings preview uses static artwork. Loading, blocked autoplay, embedding or network failures retain the cover underneath; player failures fall back to that cover with an explanatory tooltip. Reload the Browser source to retry a failed video. Spotify’s official [track object](https://developer.spotify.com/documentation/web-api/reference/get-track) and [Web Playback SDK](https://developer.spotify.com/documentation/web-playback-sdk/reference) do not expose Canvas videos: Spotify tracks retain their cover/vinyl artwork. No private API, video extraction or credentials are used by overlays.
+If Canvas can't load, the overlay falls back to cover art. Reload the OBS Browser source to retry. The settings preview uses static artwork. Spotify's public APIs don't expose Canvas videos, so Spotify tracks use cover or vinyl artwork.
 
-## Mixed stream playlists
+## Provider documentation
 
-In Listening → Your playlists, create named playlists containing both Spotify and YouTube tracks. Add individual links or song/artist searches, or append whole provider playlists. Search retains Spotify → YouTube Music → YouTube video priority. Imports append without replacing existing songs and skip duplicates by provider ID; a failed import leaves the saved list untouched. Provider credentials and playlist access requirements above still apply.
+- Spotify: [Web Playback SDK](https://developer.spotify.com/documentation/web-playback-sdk), [Development Mode access](https://developer.spotify.com/documentation/web-api/concepts/quota-modes), [playlist API changes](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide).
+- YouTube: [IFrame API](https://developers.google.com/youtube/iframe_api_reference), [required player functionality](https://developers.google.com/youtube/terms/required-minimum-functionality).
 
-Select **Use for stream** to rotate a saved playlist whenever requests and personal listening are empty. Requests wait for the current song to finish, then play before personal listening and the next stream track. You can rename, reorder and remove songs; active edits affect future tracks without restarting playback. Switching, stopping or deleting the active playlist also leaves the current song playing. Saved order is independent of playback rotation, and playlists survive restarts and settings exports/imports. Reopening remains paused.
-
-The original Base playlist URL import remains available in setup and Listening. It replaces the stream selection with a direct imported base; named playlists remain saved. Use Append playlist in the library to combine imports instead. The library holds up to 100 playlists and 10,000 songs each; each provider import reads up to 1,000 entries.
+Spotify's [Developer Policy](https://developer.spotify.com/policy) restricts cross-service integration and broadcasting. Working playback doesn't grant provider approval or music rights. Encore uses the official players and doesn't download or extract audio streams.

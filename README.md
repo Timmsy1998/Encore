@@ -112,7 +112,7 @@ npm run test:desktop
 
 Desktop smoke tests need the Electron runtime and a graphical session. Build Windows packages on Windows with `npm run package:win`.
 
-More details: [architecture](docs/ARCHITECTURE.md), [releasing](docs/RELEASE.md), [test and playback records](docs/VERIFICATION.md).
+More details: [architecture](docs/ARCHITECTURE.md), [releasing](docs/RELEASE.md).
 
 ## Credits and licence
 

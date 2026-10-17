@@ -1,15 +1,42 @@
-# Architecture and security
+# How Encore is organised
 
-`desktop/main.ts` owns a serialized command/event chain, queue, persistence, provider credentials, loopback server, Streamer.bot connection and desktop lifecycle. `src/core/queue.ts` is independently testable queue logic; `contracts.ts` defines Zod schemas and the narrow bridge. `providers.ts` owns metadata and PKCE/refresh; `streamerbot.ts` owns authenticated socket lifecycle. `compatibility.ts` preserves upstream import/command semantics. `store.ts` writes atomically and preserves invalid-state recovery copies.
+Encore has three parts: the Electron main process, the React interface and a separate browser view for playback.
 
-React in `src/` renders snapshots and sends validated commands through `desktop/preload.ts`. Node integration is off; context isolation and sandboxing are on. IPC checks sender/main-frame origin and Zod payloads. No shell, generic IPC or unrestricted file API is exposed. External links are selected from a fixed allowlist; navigation/new windows are restricted. Provider content has a separate sandboxed WebContentsView without the application preload. CSP allowances are limited to the official provider origins required by the APIs.
+| Location | Purpose |
+| --- | --- |
+| `desktop/main.ts` | App lifecycle, commands, queue and connections |
+| `desktop/preload.ts` | Typed bridge between the interface and main process |
+| `src/core/queue.ts` | Queue ordering and request rules |
+| `src/core/playlists.ts` | Saved mixed-provider playlists |
+| `src/core/contracts.ts` | Shared types and Zod validation |
+| `desktop/providers.ts` | Provider metadata, Spotify login and token refresh |
+| `desktop/streamerbot.ts` | Streamer.bot connection and events |
+| `desktop/compatibility.ts` | Upstream action compatibility |
+| `desktop/store.ts` | Settings storage and recovery |
+| `src/` | React interface |
 
-Loopback binds only `127.0.0.1:17843` and checks Host, exact routes, request origin and payload bounds. Public SSE/current-track/overlay routes disclose current title/author/requester/playing state to local clients, not queue administration or secrets. Privileged provider POSTs require a per-process random bearer credential. The bearer is passed to the isolated local player, never the overlay. This local credential is short-lived; it is not a provider account credential. The OAuth callback checks one-use state/PKCE. No network listener is exposed on LAN.
+## State and playback
 
-Secrets are encrypted by Electron safeStorage; Linux's `basic_text` backend is rejected. Without secure storage, the UI warns and credentials remain session-only. Refresh tokens stay in main. SDK access tokens reach only the provider context as required. Exports and redacted diagnostics omit credentials. A local process with the same user's OS privileges is outside this isolation boundary.
+Main owns the queue and saves changes serially. React displays snapshots and sends commands, so changing pages doesn't interrupt playback or create new provider connections.
 
-Queue precedence is pending requests, personal listening, then rotating base. Requests never interrupt a playing track. Current-track/provider generation identifiers reject stale or duplicate end callbacks. Main retains state across renderer navigation and enforces single-instance operation. Restart restores interrupted music at the head of its lane but paused. Invalid/future state versions fail with a recovery copy; schema v1 is the only supported format, not a claim of arbitrary legacy localStorage migration.
+The queue plays requests first, then personal listening, then the rotating stream playlist. A new request waits for the current song to finish. Provider callbacks include the track and playback generation so late or repeated callbacks can't advance the queue twice. On restart, interrupted music returns to its queue and playback stays paused.
 
-The main-process electron-updater checks the fixed public GitHub repository for stable releases, downloads with SHA-512 verification, and installs only after an explicit Restart and install command. Update network work runs outside the playback command queue. Restart pauses playback and saves the queue; ordinary quit does not install. Development and portable copies use manual replacement. No GitHub token is shipped. Windows packaging uses a pinned SHA-256-verified Castlabs runtime. Review its runtime and builder dependencies before release. The development-only `extract-zip` chain currently has an unresolved archive/symlink traversal advisory; archive identity is checked before extraction and untrusted archives are never accepted. Production dependency audit is recorded in VERIFICATION.md. Do not suppress advisories or claim the full toolchain is vulnerability-free.
+Settings use a versioned schema and atomic writes. Invalid or unsupported files are kept as recovery copies. Saved playlist order is separate from the current playback rotation.
 
-Timers, subscriptions, SDK connections, sockets and SSE clients are cleaned up on shutdown. Streamer.bot uses reconnect backoff rather than polling. SDK completion sampling reads local player state only. No analytics or account data telemetry is added.
+## Process boundaries
+
+The interface runs with Node disabled, sandboxing enabled and context isolation enabled. The preload exposes named operations; main validates their payloads and sender. Navigation, popups and external links are restricted.
+
+Spotify and YouTube run in a separate sandboxed `WebContentsView` without the app's preload. Spotify commands target Encore's SDK device. Provider tokens aren't sent to the React interface or OBS.
+
+The local server listens at `127.0.0.1:17843`. It checks the Host header, routes, origins and request sizes. Overlay routes expose current-track information only. Player control endpoints require a random per-process bearer token. Spotify login uses PKCE and expiring, one-use state.
+
+Credentials use Electron's `safeStorage`. Linux's plaintext backend is rejected; without secure storage, credentials are session-only and the app shows a warning. Backups omit credentials.
+
+## Connections and updates
+
+Streamer.bot reconnects with backoff and subscribes once per connection. Shutdown closes sockets, timers, player connections and overlay event streams.
+
+Installed copies use `electron-updater` with the public GitHub repository. Downloads are checked against release metadata and installed when the user chooses **Restart and install**. Update downloads run separately from playback commands. Portable copies are updated manually.
+
+Windows builds use the pinned Castlabs Electron runtime. See [releasing](RELEASE.md) for packaging and signing.
