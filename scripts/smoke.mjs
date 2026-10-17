@@ -191,6 +191,34 @@ try {
       await window.getByLabel("Overlay style", { exact: true }).selectOption("minimal");
       await expect(overlay.locator("main")).toHaveClass(/minimal/);
       await overlay.screenshot({ path: "test-results/electron-overlay.png" });
+      await window.getByRole("button", { name: "Add overlay", exact: true }).click();
+      await expect(window.getByRole("textbox", { name: "Browser-source URL" })).toHaveValue(/\?preset=/);
+      const sourceUrl = await window.getByRole("textbox", { name: "Browser-source URL" }).inputValue();
+      if (!sourceUrl.includes("?preset=")) throw Error("Missing independent overlay URL");
+      await window.getByLabel("Overlay style", { exact: true }).selectOption("card");
+      const secondId = await app.evaluate(async ({ BrowserWindow }, url) => {
+        const view = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+        await view.loadURL(url + "&test=1");
+        return view.id;
+      }, sourceUrl);
+      const second = app.windows().find(page => page.url() === sourceUrl + "&test=1");
+      if (!second) throw Error("Second OBS overlay did not load");
+      try {
+        await expect(second.locator("main")).toHaveClass(/card/);
+        await expect(overlay.locator("main")).toHaveClass(/minimal/);
+        await window.getByLabel("Overlay name", { exact: true }).fill("Second box");
+        await window.getByRole("button", { name: "Save name", exact: true }).click();
+        await expect(window.getByRole("textbox", { name: "Browser-source URL" })).toHaveValue(sourceUrl);
+        await window.getByRole("button", { name: "Copy overlay URL" }).click();
+        await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe(sourceUrl);
+        await window.getByLabel("Overlay style", { exact: true }).selectOption("glass");
+        await expect(second.locator("main")).toHaveClass(/glass/);
+        await expect(overlay.locator("main")).toHaveClass(/minimal/);
+        await window.getByRole("button", { name: "Delete overlay", exact: true }).click();
+        await expect(second.locator("main")).toBeHidden();
+        await expect(overlay.locator("main")).toBeVisible();
+      } finally { await app.evaluate(({ BrowserWindow }, id) => BrowserWindow.fromId(id)?.destroy(), secondId); }
+
     } finally { await app.evaluate(({ BrowserWindow }, id) => BrowserWindow.fromId(id)?.destroy(), overlayId); }
     await window.getByRole("button", { name: "Copy overlay URL" }).click();
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))

@@ -35,6 +35,7 @@ import {
   type Snapshot,
   type Command,
 } from "../src/core/contracts";
+import { overlayAppearance, overlayUrl } from "../src/core/overlays";
 import { Queue } from "../src/core/queue";
 import { Store } from "./store";
 import { Providers } from "./providers";
@@ -98,16 +99,17 @@ function snapshot(): Snapshot {
 }
 let trackGeneration = 0;
 let playbackSample = { generation: -1, position: 0, observedAt: 0, active: false };
-function publicState() {
+function publicState(presetId?: string) {
+  const appearance = overlayAppearance(queue.state.settings, presetId);
   return {
     current: queue.current,
     playing: queue.playing,
     generation,
     trackGeneration,
     volume: queue.state.settings.volume,
-    accent: queue.state.settings.overlayAccent,
-    compact: queue.state.settings.overlayCompact,
-    appearance: Object.fromEntries(Object.entries(queue.state.settings).filter(([name]) => name.startsWith("overlay"))),
+    accent: appearance.overlayAccent,
+    compact: appearance.overlayCompact,
+    appearance,
     progress: playbackSample.generation === generation ? playbackSample : null,
   };
 }
@@ -514,7 +516,8 @@ async function command(c: Command) {
       clipboard.writeText(origin + "/callback");
       break;
     case "copyOverlayUrl":
-      clipboard.writeText(origin + "/overlay.html");
+      overlayAppearance(queue.state.settings, c.presetId);
+      clipboard.writeText(overlayUrl(origin + "/overlay.html", c.presetId));
       break;
     case "copyImport":
       clipboard.writeText(
@@ -563,7 +566,8 @@ async function command(c: Command) {
       );
       break;
     case "overlayTest":
-      await shell.openExternal(origin + "/overlay.html?test=1");
+      overlayAppearance(queue.state.settings, c.presetId);
+      await shell.openExternal(overlayUrl(origin + "/overlay.html", c.presetId, true));
       break;
     case "export": {
       const result = await dialog.showSaveDialog({
@@ -738,7 +742,11 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname === "/now") {
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify(publicState()));
+      try {
+        res.end(JSON.stringify(publicState(url.searchParams.get("preset") ?? undefined)));
+      } catch {
+        res.writeHead(404).end(JSON.stringify({ error: "Overlay not found" }));
+      }
       return;
     }
     if (url.pathname === "/events") {

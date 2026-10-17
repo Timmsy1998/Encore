@@ -59,3 +59,9 @@ No release tag, push or publication was performed. Local commits exclude brief.m
 - Player fixtures verify direct YouTube load-and-play, provider switching, resume without reload, repeated-track restart and visible autoplay blocking. They do not establish live account audio.
 - Real Castlabs Electron smoke passed setup saves, controlled OAuth and both playlist imports, failure preservation, native clipboard and isolation. A second sandboxed Electron window loaded the actual loopback OBS page and verified live style/accent changes; its screenshot was visually inspected.
 - Windows packaging/startup checks run in the tag workflow. Manual account audio, installed update interaction and OBS capture remain unverified locally. This release includes the previously recorded playlist import fixes.
+
+## Independent saved overlays
+
+- Node 24.11.0 on Linux/WSL: TypeScript, ESLint, all 47 unit/contract tests, production build and 21 Chromium checks passed. Coverage includes old-settings migration, validated unique preset IDs, independent styles, rename URL stability, persisted designs and deletion.
+- Real Castlabs Electron smoke passed with two simultaneous sandboxed windows loading actual loopback overlay URLs. Editing a saved design updated its window while the default stayed unchanged; renaming preserved its URL, native clipboard copied that URL, and deletion hid only that source. Existing setup, controlled provider import and isolation checks also passed.
+- Manual Windows OBS capture and live provider accounts were not exercised for this change. No new release was published for these changes.

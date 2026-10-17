@@ -1,12 +1,14 @@
 import { renderOverlay } from "./overlay-renderer.js";
-const testing = new URLSearchParams(location.search).get("test") === "1";
+const params = new URLSearchParams(location.search);
+const testing = params.get("test") === "1";
+const endpoint = params.has("preset") ? `/now?preset=${encodeURIComponent(params.get("preset"))}` : "/now";
 const box = document.querySelector("main");
 let updating = false;
 async function update() {
   if (updating) return;
   updating = true;
   try {
-    const response = await fetch("/now", { cache: "no-store" });
+    const response = await fetch(endpoint, { cache: "no-store" });
     if (!response.ok) throw Error("Disconnected");
     renderOverlay(box, await response.json(), testing);
   } catch { box.hidden = true; }

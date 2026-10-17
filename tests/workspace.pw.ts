@@ -193,3 +193,28 @@ test("OBS overlay shows provider progress, safe metadata, and live appearance", 
   Object.assign(model.appearance, { overlayHidePaused: true });
   await expect(page.locator("main")).toBeHidden();
 });
+
+test("saved overlays have independent designs, stable URLs and persistent names", async ({ page }) => {
+  await boot(page);
+  await page.getByRole("button", { name: "Overlay", exact: true }).click();
+  const url = page.getByRole("textbox", { name: "Browser-source URL" });
+  const original = await url.inputValue();
+  await page.getByRole("button", { name: "Add overlay", exact: true }).click();
+  await expect(url).toHaveValue(/\?preset=/);
+  const separate = await url.inputValue();
+  await page.getByLabel("Overlay style", { exact: true }).selectOption("minimal");
+  await page.getByLabel("Overlay name", { exact: true }).fill("Compact stream box");
+  await page.getByRole("button", { name: "Save name", exact: true }).click();
+  await expect(url).toHaveValue(separate);
+  await page.getByLabel("Saved overlay", { exact: true }).selectOption("");
+  await expect(url).toHaveValue(original);
+  await expect(page.getByLabel("Overlay style", { exact: true })).toHaveValue("card");
+  await page.reload();
+  await page.getByRole("button", { name: "Overlay", exact: true }).click();
+  await page.getByLabel("Saved overlay", { exact: true }).selectOption({ label: "Compact stream box" });
+  await expect(url).toHaveValue(separate);
+  await expect(page.getByLabel("Overlay style", { exact: true })).toHaveValue("minimal");
+  await page.getByRole("button", { name: "Delete overlay", exact: true }).click();
+  await expect(url).toHaveValue(original);
+  await expect(page.getByRole("option", { name: "Compact stream box" })).toHaveCount(0);
+});

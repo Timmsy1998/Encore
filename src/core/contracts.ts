@@ -12,6 +12,29 @@ export const TrackSchema = z.object({
   user: z.string().min(1).max(100).default("Streamer"),
 });
 export type Track = z.infer<typeof TrackSchema>;
+export const OverlayAppearanceSchema = z.object({
+  overlayAccent: z
+    .string()
+    .regex(/^#[a-fA-F0-9]{6}$/)
+    .default("#e5aa73"),
+  overlayCompact: z.boolean().default(false),
+  overlayTheme: z.enum(["card", "glass", "minimal"]).default("card"),
+  overlayBackground: z.string().regex(/^#[a-fA-F0-9]{6}$/).default("#17191f"),
+  overlayText: z.string().regex(/^#[a-fA-F0-9]{6}$/).default("#ffffff"),
+  overlayOpacity: z.number().int().min(0).max(100).default(92),
+  overlayRadius: z.number().int().min(0).max(48).default(24),
+  overlayWidth: z.number().int().min(300).max(900).default(560),
+  overlayArtwork: z.boolean().default(true),
+  overlayProgress: z.boolean().default(true),
+  overlayRequester: z.boolean().default(true),
+  overlayHidePaused: z.boolean().default(false),
+});
+export type OverlayAppearance = z.infer<typeof OverlayAppearanceSchema>;
+export const OverlayPresetSchema = z.object({
+  id: z.uuid(),
+  name: z.string().trim().min(1).max(60),
+  appearance: OverlayAppearanceSchema,
+});
 export const SettingsSchema = z.object({
   wsPort: z.number().int().min(1).max(65535).default(8080),
   clientId: z
@@ -28,21 +51,11 @@ export const SettingsSchema = z.object({
   launchAtLogin: z.boolean().default(false),
   setupStep: z.number().int().min(0).max(8).default(0),
   setupComplete: z.boolean().default(false),
-  overlayAccent: z
-    .string()
-    .regex(/^#[a-fA-F0-9]{6}$/)
-    .default("#e5aa73"),
-  overlayCompact: z.boolean().default(false),
-  overlayTheme: z.enum(["card", "glass", "minimal"]).default("card"),
-  overlayBackground: z.string().regex(/^#[a-fA-F0-9]{6}$/).default("#17191f"),
-  overlayText: z.string().regex(/^#[a-fA-F0-9]{6}$/).default("#ffffff"),
-  overlayOpacity: z.number().int().min(0).max(100).default(92),
-  overlayRadius: z.number().int().min(0).max(48).default(24),
-  overlayWidth: z.number().int().min(300).max(900).default(560),
-  overlayArtwork: z.boolean().default(true),
-  overlayProgress: z.boolean().default(true),
-  overlayRequester: z.boolean().default(true),
-  overlayHidePaused: z.boolean().default(false),
+  ...OverlayAppearanceSchema.shape,
+  overlayPresets: z.array(OverlayPresetSchema).max(20).refine(
+    presets => new Set(presets.map(preset => preset.id)).size === presets.length,
+    "Overlay IDs must be unique",
+  ).default([]),
   reply: z.string().max(500).default("@{user} · {message}"),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
@@ -127,16 +140,18 @@ export const CommandSchema = z.discriminatedUnion("type", [
       "spotifyDisconnect",
       "export",
       "import",
-      "overlayTest",
       "diagnostics",
       "copyImport",
       "copyRedirectUri",
-      "copyOverlayUrl",
       "checkImport",
       "checkUpdates",
       "installUpdate",
       "showPlayer",
     ]),
+  }),
+  z.object({
+    type: z.enum(["copyOverlayUrl", "overlayTest"]),
+    presetId: z.uuid().optional(),
   }),
   z.object({
     type: z.literal("open"),

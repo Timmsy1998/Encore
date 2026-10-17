@@ -44,7 +44,7 @@ Encore authenticates and subscribes once per WebSocket connection, reconnects wi
 
 ## OBS
 
-Open Overlay, copy the browser-source URL and use the suggested dimensions. Accent colour and compact layout are configurable; the preview/test is explicitly labelled sample data. Encore must be running. The overlay reconnects after restart and exposes only current-track information.
+Open Overlay, choose Default overlay or Add overlay, and copy its browser-source URL into OBS at 960 × 260. Create up to 20 additional overlays with independent styles, colours, dimensions and visibility controls, and use several Browser sources together. Add overlay copies the selected design. Rename a saved overlay without changing its URL; deleting it hides that source. The default URL remains compatible. Designs persist across restarts and update live; the preview/test is explicitly labelled sample data. Encore must be running. The overlay exposes only current-track information.
 
 **The overlay has no audio.** Capture Encore's application audio once for both sources. Avoid capturing the same audio again through Desktop Audio. YouTube video remains visible in Encore's provider panel; Spotify plays through Encore's browser device. Verify your OBS capture path on Windows and obtain the necessary music/broadcast rights.
 
@@ -84,7 +84,7 @@ Windows packaging should run on Windows. Linux UI tests need Chromium system lib
 
 ## Known limitations
 
-Real-account playback, Windows installer/portable behaviour and OBS capture are release gates, not verified results of the automated suite. Spotify's policy restricts integration with another service's content; provider permission and broadcast rights must be resolved before distribution/use. Upstream's six translations remain in the original browser source; Encore's new UI is English only. Overlay options are accent/compact rather than all legacy themes. No progress seeking, Linux/macOS distribution or stream downloading is provided.
+Real-account playback, Windows installer/portable behaviour and OBS capture are release gates, not verified results of the automated suite. Spotify's policy restricts integration with another service's content; provider permission and broadcast rights must be resolved before distribution/use. Upstream's six translations remain in the original browser source; Encore's new UI is English only. Overlay offers three customisable styles and independent saved designs rather than all legacy themes. No progress seeking, Linux/macOS distribution or stream downloading is provided.
 
 ## Licence and attribution
 

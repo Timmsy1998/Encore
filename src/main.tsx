@@ -39,15 +39,17 @@ import {
   type Command,
   type Track,
   type Settings,
+  type OverlayAppearance,
 } from "./core/contracts";
+import { overlayAppearance, overlayUrl } from "./core/overlays";
 import "./styles.css";
 import "../public/overlay.css";
 import { renderOverlay } from "../public/overlay-renderer.js";
-function OverlayPreview({ state }: { state: Snapshot }) {
+function OverlayPreview({ state, appearance }: { state: Snapshot; appearance: OverlayAppearance }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (ref.current) renderOverlay(ref.current, { current: state.current, playing: state.playing, appearance: state.settings }, true);
-  }, [state]);
+    if (ref.current) renderOverlay(ref.current, { current: state.current, playing: state.playing, appearance }, true);
+  }, [state, appearance]);
   return <div className="overlay-stage"><div ref={ref} aria-label="Overlay preview" /></div>;
 }
 const pages = [
@@ -143,6 +145,7 @@ function App() {
     [importingPlaylist, setImportingPlaylist] = useState(false),
     [playlistResult, setPlaylistResult] = useState(""),
     [drag, setDrag] = useState<number>();
+  const [selectedOverlay, setSelectedOverlay] = useState("");
   const [draft, setDraft] = useState<Partial<Settings>>({});
   useEffect(() => {
     let live = true;
@@ -400,37 +403,70 @@ function App() {
       </p>
     </>
   );
+  const preset = s.settings.overlayPresets.find(item => item.id === selectedOverlay);
+  const presetId = preset?.id;
+  const appearance = overlayAppearance(s.settings, presetId);
+  const updateAppearance = (patch: Partial<OverlayAppearance>) => {
+    if (preset) config({ overlayPresets: s.settings.overlayPresets.map(item => item.id === preset.id ? { ...item, appearance: { ...item.appearance, ...patch } } : item) });
+    else config(patch);
+  };
+  async function addOverlay() {
+    if (!s) return;
+    const id = crypto.randomUUID();
+    if (await send({ type: "settings", settings: { overlayPresets: [...s.settings.overlayPresets, { id, name: `Overlay ${s.settings.overlayPresets.length + 1}`, appearance }] } })) setSelectedOverlay(id);
+  }
   const overlayForm = (
     <>
       <p>
         A silent now-playing overlay for OBS. Add a Browser source at 960 × 260
         and paste this URL. Changes appear live in OBS while Encore is open. Resize the source in OBS to fit your scene.
       </p>
+      <Field label="Saved overlay" hint="Each overlay has its own URL and appearance. Use several Browser sources together in OBS.">
+        <select aria-label="Saved overlay" value={presetId ?? ""} onChange={e => setSelectedOverlay(e.target.value)}>
+          <option value="">Default overlay</option>
+          {s.settings.overlayPresets.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>
+      </Field>
+      <div className="row-actions">
+        <Button variant="secondary" disabled={busy || s.settings.overlayPresets.length >= 20} onClick={addOverlay}>Add overlay</Button>
+        {preset && <Button variant="ghost" disabled={busy} onClick={async () => {
+          if (await send({ type: "settings", settings: { overlayPresets: s.settings.overlayPresets.filter(item => item.id !== preset.id) } })) setSelectedOverlay("");
+        }}>Delete overlay</Button>}
+      </div>
+      {preset && <form key={`${preset.id}-${preset.name}`} onSubmit={e => {
+        e.preventDefault();
+        const name = String(new FormData(e.currentTarget).get("name") ?? "").trim();
+        if (name) config({ overlayPresets: s.settings.overlayPresets.map(item => item.id === preset.id ? { ...item, name } : item) });
+      }}>
+        <Field label="Overlay name"><input name="name" required maxLength={60} defaultValue={preset.name} /></Field>
+        <Button type="submit" variant="secondary" disabled={busy}>Save name</Button>
+        <p className="muted">Renaming keeps the same URL. Deleting hides this overlay in existing OBS sources.</p>
+      </form>}
       <Field label="Browser-source URL">
         <div className="copy-field">
-          <input readOnly value={s.overlayUrl} />
+          <input readOnly value={overlayUrl(s.overlayUrl, presetId)} />
           <Button
             variant="ghost"
             size="icon"
             aria-label="Copy overlay URL"
-            onClick={() => send({ type: "copyOverlayUrl" })}
+            onClick={() => send({ type: "copyOverlayUrl", presetId })}
           >
             <Copy size={16} />
           </Button>
         </div>
       </Field>
-      <OverlayPreview state={s} />
+      <OverlayPreview state={s} appearance={appearance} />
       <div className="overlay-controls">
-        <Field label="Overlay style"><select aria-label="Overlay style" value={s.settings.overlayTheme} onChange={e => config({ overlayTheme: e.target.value as Settings["overlayTheme"] })}>
+        <Field label="Overlay style"><select aria-label="Overlay style" value={appearance.overlayTheme} onChange={e => updateAppearance({ overlayTheme: e.target.value as Settings["overlayTheme"] })}>
           <option value="card">Album card</option><option value="glass">Accent glass</option><option value="minimal">Minimal</option>
         </select></Field>
-        {([ ["overlayAccent", "Accent colour"], ["overlayBackground", "Background colour"], ["overlayText", "Text colour"] ] as const).map(([name, label]) => <Field key={name} label={label}><input aria-label={label} type="color" value={s.settings[name]} onChange={e => config({ [name]: e.target.value })} /></Field>)}
-        {([ ["overlayOpacity", "Background opacity", 0, 100, "%"], ["overlayRadius", "Corner radius", 0, 48, "px"], ["overlayWidth", "Card width", 300, 900, "px"] ] as const).map(([name, label, min, max, unit]) => <Field key={name} label={`${label} · ${s.settings[name]}${unit}`}><input aria-label={label} type="range" min={min} max={max} value={s.settings[name]} onChange={e => config({ [name]: Number(e.target.value) })} /></Field>)}
+        {([ ["overlayAccent", "Accent colour"], ["overlayBackground", "Background colour"], ["overlayText", "Text colour"] ] as const).map(([name, label]) => <Field key={name} label={label}><input aria-label={label} type="color" value={appearance[name]} onChange={e => updateAppearance({ [name]: e.target.value })} /></Field>)}
+        {([ ["overlayOpacity", "Background opacity", 0, 100, "%"], ["overlayRadius", "Corner radius", 0, 48, "px"], ["overlayWidth", "Card width", 300, 900, "px"] ] as const).map(([name, label, min, max, unit]) => <Field key={name} label={`${label} · ${appearance[name]}${unit}`}><input aria-label={label} type="range" min={min} max={max} value={appearance[name]} onChange={e => updateAppearance({ [name]: Number(e.target.value) })} /></Field>)}
       </div>
       <div className="overlay-toggles">
-        {([ ["overlayCompact", "Compact layout"], ["overlayArtwork", "Show artwork"], ["overlayProgress", "Show progress"], ["overlayRequester", "Show requester"], ["overlayHidePaused", "Hide when paused"] ] as const).map(([name, label]) => <Toggle key={name} label={label} checked={s.settings[name]} onChange={v => config({ [name]: v })} />)}
+        {([ ["overlayCompact", "Compact layout"], ["overlayArtwork", "Show artwork"], ["overlayProgress", "Show progress"], ["overlayRequester", "Show requester"], ["overlayHidePaused", "Hide when paused"] ] as const).map(([name, label]) => <Toggle key={name} label={label} checked={appearance[name]} onChange={v => updateAppearance({ [name]: v })} />)}
       </div>
-      <Button variant="secondary" onClick={() => send({ type: "overlayTest" })}>Open test overlay</Button>
+      <Button variant="secondary" onClick={() => send({ type: "overlayTest", presetId })}>Open test overlay</Button>
       <p className="notice">
         Music plays in Encore. Capture Encore application audio once in OBS;
         keep this browser source muted. Provider content needs appropriate
