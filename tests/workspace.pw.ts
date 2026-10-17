@@ -165,6 +165,7 @@ test("overlay customisation persists and matches the OBS renderer", async ({ pag
   await page.getByLabel("Overlay style", { exact: true }).selectOption("glass");
   await page.getByLabel("Overlay layout", { exact: true }).selectOption("vertical");
   await page.getByRole("switch", { name: "Spinning vinyl artwork", exact: true }).click();
+  await page.getByRole("switch", { name: "Canvas video artwork", exact: true }).click();
   await page.getByLabel("Accent colour", { exact: true }).fill("#70e0cc");
   await page.getByRole("switch", { name: "Show artwork", exact: true }).click();
   await page.getByRole("switch", { name: "Compact layout", exact: true }).click();
@@ -177,6 +178,8 @@ test("overlay customisation persists and matches the OBS renderer", async ({ pag
   await expect(page.getByLabel("Overlay style", { exact: true })).toHaveValue("glass");
   await expect(preview).toHaveCSS("--accent", "#70e0cc");
   await expect(preview).toHaveClass(/vertical vinyl/);
+  await expect(page.getByRole("switch", { name: "Canvas video artwork", exact: true })).toBeChecked();
+  await expect(preview.locator("iframe")).toHaveCount(0);
 });
 
 test("OBS overlay shows provider progress, safe metadata, and live appearance", async ({ page }) => {
@@ -269,4 +272,75 @@ test("overlay gallery, vinyl, request attribution and transitions follow live pl
   model.current.title = "Reduced motion song";
   await expect(card.locator("h1")).toHaveText("Reduced motion song");
   expect(await card.evaluate(el => el.getAnimations().length)).toBe(0);
+});
+
+test("Canvas follows playback silently, cleans up and falls back to covers", async ({ page }) => {
+  const model = { current: { id: "youtube0001", source: "youtube", title: "Canvas song", author: "Artist", duration: 180 }, trackGeneration: 1, playing: true, appearance: { overlayCanvas: true, overlayVinyl: true, overlayHidePaused: false }, progress: { position: 42, observedAt: Date.now(), active: true } };
+  await page.addInitScript(() => {
+    const calls: string[] = [];
+    // Keep the fixture event stream connected; polling supplies controlled updates.
+    Object.assign(window, { EventSource: class { close() {} }, canvasCalls: calls, YT: { Player: class {
+      position = 0;
+      state = -1;
+      frame = document.createElement("iframe");
+      constructor(host: HTMLElement, options: { playerVars: { mute: number }; events: { onReady: (event: { target: unknown }) => void; onError: () => void } }) {
+        calls.push(`create:mute=${options.playerVars.mute}`);
+        host.replaceWith(this.frame);
+        Object.assign(window, { failCanvas: options.events.onError });
+        queueMicrotask(() => options.events.onReady({ target: this }));
+      }
+      mute() { calls.push("mute"); }
+      seekTo(position: number) { this.position = position; calls.push(`seek:${Math.floor(position)}`); }
+      getCurrentTime() { return this.position; }
+      getPlayerState() { return this.state; }
+      playVideo() { this.state = 1; calls.push("play"); }
+      pauseVideo() { this.state = 2; calls.push("pause"); }
+      destroy() { this.frame.remove(); calls.push("destroy"); }
+    } } });
+  });
+  await page.route("**/now", route => route.fulfill({ json: model }));
+  await page.route("**/events", route => route.fulfill({ contentType: "text/event-stream", body: "data: connected\n\n" }));
+  await page.route("https://i.ytimg.com/**", route => route.abort());
+  await page.goto("/overlay.html");
+  const art = page.locator("main:not([data-transition]) .encore-art");
+  const calls = () => page.evaluate(() => (window as unknown as { canvasCalls: string[] }).canvasCalls);
+  await expect(art).toHaveAttribute("data-canvas", "ready");
+  await expect(art).toHaveCSS("width", "200px");
+  await expect(art).toHaveCSS("height", "200px");
+  expect(await calls()).toEqual(expect.arrayContaining(["create:mute=1", "mute", "play"]));
+  await expect(page.locator("iframe")).toHaveCount(1);
+  model.progress.position = 90;
+  model.progress.active = false;
+  model.playing = false;
+  await expect.poll(calls).toContain("seek:90");
+  await expect.poll(calls).toContain("pause");
+  expect((await calls()).filter(call => call.startsWith("create"))).toHaveLength(1);
+  model.playing = true;
+  model.progress.active = true;
+  model.trackGeneration++;
+  model.current.id = "youtube0002";
+  await expect.poll(async () => (await calls()).filter(call => call.startsWith("create")).length).toBe(2);
+  await expect(page.locator('[data-transition="outgoing"] iframe')).toHaveCount(0);
+  await expect(page.locator("iframe")).toHaveCount(1);
+  await page.evaluate(() => (window as unknown as { failCanvas: () => void }).failCanvas());
+  await expect(art).toHaveAttribute("data-canvas", "fallback");
+  await expect(art).toHaveAttribute("title", /Showing cover art/);
+  await expect(page.locator("iframe")).toHaveCount(0);
+  model.progress.position = 100;
+  model.progress.active = false;
+  await expect(page.locator(".encore-times").first()).toHaveText("1:403:00");
+  expect((await calls()).filter(call => call.startsWith("create"))).toHaveLength(2);
+  model.current.source = "spotify";
+  model.current.id = "spotify001";
+  model.trackGeneration++;
+  await expect(art).not.toHaveAttribute("data-canvas");
+  await expect(page.locator("iframe")).toHaveCount(0);
+  model.current.source = "youtube";
+  model.current.id = "youtube0003";
+  model.trackGeneration++;
+  await expect(art).toHaveAttribute("data-canvas", "ready");
+  model.appearance.overlayHidePaused = true;
+  model.playing = false;
+  await expect(page.locator("main").first()).toBeHidden();
+  await expect(page.locator("iframe")).toHaveCount(0);
 });

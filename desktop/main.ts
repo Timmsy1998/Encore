@@ -767,7 +767,7 @@ const server = createServer(async (req, res) => {
     const path =
       url.pathname === "/" ? "/index.html" : decodeURIComponent(url.pathname);
     if (
-      !/^\/(?:index\.html|overlay(?:-renderer)?\.(?:html|css|js)|player\.(?:html|css|js)|assets\/[a-zA-Z0-9_.-]+)$/.test(
+      !/^\/(?:index\.html|overlay(?:-renderer|-canvas)?\.(?:html|css|js)|player\.(?:html|css|js)|assets\/[a-zA-Z0-9_.-]+)$/.test(
         path,
       )
     ) {

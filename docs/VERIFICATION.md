@@ -78,3 +78,9 @@ No release tag, push or publication was performed. Local commits exclude brief.m
 - Node 24.11.0 on Linux/WSL: TypeScript, ESLint, all 58 unit/contract tests and production build passed. New controlled provider cases cover Spotify preference, unavailable-track fallback, artist Topic/auto-generated and official-audio ranking, video fallback, metadata ordering, encoded queries, explicit links and visible provider failures.
 - All 24 Chromium UI checks passed across three display sizes. The real Castlabs Electron smoke passed existing setup, controlled playlist imports, clipboard, navigation and live overlays. Search priority itself is covered by controlled provider unit tests.
 - YouTube Music preference uses metadata heuristics within YouTube search results, not a separately authenticated Music catalogue. Real-account search quality, audio and Windows checks remain unverified for this change.
+
+## Canvas artwork
+
+- Node 24.11.0 on Linux/WSL: TypeScript, ESLint, all 58 unit/contract tests and production build passed. Migration coverage includes the default-off Canvas setting and independent saved designs.
+- All 27 Chromium checks passed across three display sizes, covering the persisted toggle, static settings preview, minimum square player size, muted initialization, playback/seek synchronisation without reload, track changes without cloned video frames, error fallback and disposal when hidden or switching to Spotify. Provider playback uses a controlled IFrame API fixture rather than a live YouTube account.
+- Real Castlabs Electron smoke passed setup saves, controlled playlist imports, native clipboard, navigation and live independent loopback overlays. Live YouTube Canvas embedding/autoplay in OBS, Windows capture and real-account audio remain unverified. Spotify Canvas is unavailable through its public APIs and is not implemented; Spotify retains cover art. No release was published for this change.

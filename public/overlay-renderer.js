@@ -1,7 +1,13 @@
+import { updateCanvas, disposeCanvas } from "./overlay-canvas.js";
 const transitions = new WeakMap();
 
+export function disposeOverlay(box) {
+  const art = box.querySelector(".encore-art");
+  if (art) disposeCanvas(art);
+}
+
 // Shared by the OBS page and the settings preview. Metadata is always text.
-export function renderOverlay(box, state, demo = false) {
+export function renderOverlay(box, state, demo = false, preview = false) {
   if (!box.firstElementChild) box.innerHTML = `<div class="encore-art"><img alt="Cover artwork"><span>♪</span></div><div class="encore-info"><div class="encore-top"><small></small><span class="encore-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span></div><h1></h1><p></p><div class="encore-requester"></div><div class="encore-timeline"><div class="encore-times"><span></span><span></span></div><div class="encore-rail"><div></div></div></div></div>`;
   const a = state.appearance || {};
   const track = state.current || (demo ? { title: "Your next favourite song", author: "Artist name", user: "A lovely viewer", duration: 214 } : null);
@@ -15,6 +21,7 @@ export function renderOverlay(box, state, demo = false) {
     if (previous?.identity && !box.hidden && track && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
       const bounds = box.getBoundingClientRect();
       outgoing = box.cloneNode(true);
+      outgoing.querySelectorAll(".encore-canvas, iframe").forEach(node => node.remove());
       outgoing.removeAttribute("id");
       outgoing.removeAttribute("aria-label");
       outgoing.setAttribute("aria-hidden", "true");
@@ -26,10 +33,12 @@ export function renderOverlay(box, state, demo = false) {
   }
   box.hidden = !track || (!demo && a.overlayHidePaused && !playing);
   if (!track) {
+    disposeOverlay(box);
     transitions.set(box, { identity, cancel() {} });
     return;
   }
-  box.className = `encore-overlay ${a.overlayTheme || "card"}${a.overlayCompact ? " compact" : ""}${playing ? " playing" : ""} ${a.overlayLayout || "horizontal"}${a.overlayVinyl ? " vinyl" : ""}`;
+  const canvas = a.overlayCanvas && a.overlayArtwork !== false && track.source === "youtube" && /^[\w-]{11}$/.test(track.id);
+  box.className = `encore-overlay ${a.overlayTheme || "card"}${a.overlayCompact ? " compact" : ""}${playing ? " playing" : ""} ${a.overlayLayout || "horizontal"}${canvas ? " canvas" : a.overlayVinyl ? " vinyl" : ""}`;
   const style = box.style;
   style.setProperty("--accent", a.overlayAccent || state.accent || "#e5aa73");
   style.setProperty("--background", a.overlayBackground || "#17191f");
@@ -54,6 +63,7 @@ export function renderOverlay(box, state, demo = false) {
   const sample = state.progress;
   const seconds = demo ? 78 : sample ? sample.position + (playing && sample.active ? Math.min(3, Math.max(0, (Date.now() - sample.observedAt) / 1000)) : 0) : 0;
   const position = Math.min(track.duration || 0, seconds);
+  updateCanvas(q(".encore-art"), track, identity, position, !!state.playing && !!sample?.active, canvas && !preview && !box.hidden);
   const time = (n) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, "0")}`;
   q(".encore-timeline").hidden = a.overlayProgress === false;
   q(".encore-times span:first-child").textContent = time(position);

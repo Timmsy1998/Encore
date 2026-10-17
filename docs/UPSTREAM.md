@@ -20,7 +20,7 @@ Upstream uses browser-owned state, YouTube IFrame API, Spotify PKCE/Web Playback
 | Import diagnostics                  | Version/capability comparison with 1.1.0, timeout and missing-feature reporting                               |
 | Setup tutorial                      | Eight persisted, skippable desktop steps                                                                      |
 | Backup/restore                      | Validated version-1 JSON; no credentials, atomic writes/recovery copies                                       |
-| Overlay                             | Silent OBS browser source; independent saved designs with stable URLs, shared live preview, three styles, horizontal/vertical galleries, optional spinning vinyl, animated equalizer and song crossfades, request-only attribution, artwork/provider progress, colours/opacity/width/radius and visibility controls; original Amuse-inspired design      |
+| Overlay                             | Silent OBS browser source; independent saved designs with stable URLs, shared live preview, three styles, horizontal/vertical galleries, optional spinning vinyl or muted square YouTube Canvas (Spotify retains covers), animated equalizer and song crossfades, request-only attribution, artwork/provider progress, colours/opacity/width/radius and visibility controls; original Amuse-inspired design      |
 | Updates                             | Installed Windows copies download stable GitHub releases; explicit restart, portable replacement manual |
 | Languages                           | Upstream English/Polish/Ukrainian/German/French/Turkish source retained; desktop UI English only (parity gap) |
 
