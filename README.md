@@ -30,7 +30,7 @@ The eight-step setup can be skipped, resumed and reopened from Settings:
 3. Copy Encore's supplied upstream 1.1.0 action import into Streamer.bot, configure channel commands and permissions there, and run import diagnostics. Encore serves its own UI and overlay; Streamer.bot HTTP hosting is unnecessary.
 4. Enable YouTube Data API v3 in a Google project, enter an API key and test it. Title searches prefer connected Spotify, then artist Topic/auto-generated or official audio on YouTube, then regular YouTube videos. Explicit track links resolve directly. Quotas, deleted videos and embedding restrictions are reported.
 5. Optionally create a Spotify developer app with Web Playback SDK/Web API access. Register **`http://127.0.0.1:17843/callback` exactly**. Enter the Client ID and connect in the system browser. No Client Secret is needed. Spotify Premium and developer-app account access are required. Authorization alone does not establish a ready playback device.
-6. Add a supported Spotify or YouTube playlist for fallback music, or add personal tracks in Listening.
+6. In Listening, create a named playlist and add Spotify and YouTube songs together. Use **Append playlist** to combine supported imports, then **Use for stream** for rotating fallback music. Requests take priority after the current song finishes; personal listening plays before the stream playlist.
 7. Optionally configure the silent OBS overlay.
 8. Add a real test request and press Play. Check each provider and switching with your own accounts.
 

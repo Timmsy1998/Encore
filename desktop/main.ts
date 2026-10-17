@@ -36,6 +36,7 @@ import {
   type Command,
 } from "../src/core/contracts";
 import { overlayAppearance, overlayUrl } from "../src/core/overlays";
+import { Playlists } from "../src/core/playlists";
 import { Queue } from "../src/core/queue";
 import { Store } from "./store";
 import { Providers } from "./providers";
@@ -397,7 +398,24 @@ async function event(input: unknown) {
 }
 async function command(c: Command) {
   error = "";
+  const playlists = new Playlists(queue.state);
   switch (c.type) {
+    case "playlistCreate": playlists.create(c.id, c.name); break;
+    case "playlistRename": playlists.rename(c.id, c.name); break;
+    case "playlistDelete": playlists.delete(c.id); break;
+    case "playlistActivate": playlists.activate(c.id); break;
+    case "playlistStop": playlists.stop(); break;
+    case "playlistAdd":
+    case "playlistImport": {
+      playlists.get(c.id);
+      const tracks = c.type === "playlistImport"
+        ? await providers.playlist(c.input)
+        : [await providers.resolve(c.input)];
+      playlists.append(c.id, tracks);
+      break;
+    }
+    case "playlistRemove": playlists.remove(c.id, c.key); break;
+    case "playlistMove": playlists.move(c.id, c.from, c.to); break;
     case "settings": {
       const old = queue.state.settings;
       const next = SettingsSchema.parse({ ...old, ...c.settings });
@@ -440,6 +458,7 @@ async function command(c: Command) {
     case "base": {
       const tracks = await providers.playlist(c.input);
       queue.state.base = [...new Map(tracks.map((t) => [key(t), t])).values()];
+      queue.state.activePlaylistId = null;
       break;
     }
     case "remove":
@@ -447,7 +466,8 @@ async function command(c: Command) {
         (t) => key(t) !== c.key,
       );
       queue.state.queue = queue.state.queue.filter((t) => key(t) !== c.key);
-      queue.state.base = queue.state.base.filter((t) => key(t) !== c.key);
+      if (queue.state.activePlaylistId) playlists.remove(queue.state.activePlaylistId, c.key);
+      else queue.state.base = queue.state.base.filter((t) => key(t) !== c.key);
       break;
     case "reorder":
       queue.reorder(c.from, c.to);

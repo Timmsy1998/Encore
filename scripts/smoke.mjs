@@ -148,6 +148,36 @@ try {
       await window.getByRole("button", { name: "Import playlist", exact: true }).click();
       await expect(window.getByRole("alert")).toContainText("YouTube playlist not found");
       expect((await window.evaluate(() => window.encore.snapshot())).base[0]?.title).toBe("YouTube import smoke");
+      // Build and persist a mixed playlist through the real UI, IPC and providers.
+      await window.getByRole("button", { name: "Listening", exact: true }).click();
+      await window.getByLabel("New playlist name").fill("Mixed stream");
+      await window.getByRole("button", { name: "Create playlist", exact: true }).click();
+      for (const input of ["https://open.spotify.com/playlist/" + "a".repeat(22), "https://www.youtube.com/playlist?list=PLabcdefghijk"]) {
+        await window.getByLabel("Playlist song or URL").fill(input);
+        await window.getByRole("button", { name: "Append playlist", exact: true }).click();
+        await expect(window.getByLabel("Playlist song or URL")).toHaveValue("");
+      }
+      await expect(window.getByRole("list", { name: "Mixed stream tracks" }).getByRole("listitem")).toHaveCount(2);
+      await window.getByRole("region", { name: "Saved playlists" }).screenshot({ path: "test-results/mixed-playlists-electron.png" });
+      await window.getByRole("button", { name: "Use for stream", exact: true }).click();
+      await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).base.map(t => t.source)).toEqual(["spotify", "youtube"]);
+      await window.getByRole("button", { name: "Move YouTube import smoke up", exact: true }).click();
+      await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).playlists[0].tracks[0].source).toBe("youtube");
+      await window.reload();
+      await window.getByRole("button", { name: "Listening", exact: true }).click();
+      await expect(window.getByRole("status").filter({ hasText: "Stream playlist: Mixed stream" })).toBeVisible();
+      await window.getByLabel("Rename playlist").fill("Mixed favourites");
+      await window.getByRole("button", { name: "Rename", exact: true }).click();
+      await expect(window.getByRole("list", { name: "Mixed favourites tracks" }).getByRole("listitem")).toHaveCount(2);
+      await window.getByLabel("Playlist song or URL").fill("https://www.youtube.com/playlist?list=PLmissing000");
+      await window.getByRole("button", { name: "Append playlist", exact: true }).click();
+      await expect(window.getByRole("alert")).toContainText("YouTube playlist not found");
+      expect((await window.evaluate(() => window.encore.snapshot())).playlists[0].tracks).toHaveLength(2);
+      await window.getByRole("button", { name: "Remove Spotify import smoke from playlist", exact: true }).click();
+      await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).base.map(t => t.source)).toEqual(["youtube"]);
+      await window.getByRole("button", { name: "Stop stream playlist", exact: true }).click();
+      await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).activePlaylistId).toBeNull();
+
     } finally {
       await app.evaluate(() => {
         globalThis.fetch = globalThis.encoreSmokeFetch;
@@ -244,7 +274,7 @@ try {
   );
   if (!denied) throw Error("Node unexpectedly exposed in renderer");
   console.log(
-    "Electron startup, preload, empty paused state, Streamer.bot/YouTube/Spotify setup saves, authorization launch, Spotify/YouTube playlist imports, failure preservation, navigation, live OBS overlay customisation and native clipboard passed.",
+    "Electron startup, preload, empty paused state, Streamer.bot/YouTube/Spotify setup saves, authorization launch, Spotify/YouTube playlist imports, mixed stream playlist creation/activation/reorder/reload/editing, failure preservation, navigation, live OBS overlay customisation and native clipboard passed.",
   );
 } finally {
   await app.close();

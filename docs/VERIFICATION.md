@@ -90,3 +90,11 @@ No release tag, push or publication was performed. Local commits exclude brief.m
 - Linux/WSL with Node 24.11.0: TypeScript, ESLint, all 58 unit/contract tests, production build, all 27 Chromium checks across three display sizes, and real Castlabs Electron smoke passed for version 1.1.0.
 - Windows packaging, packaged startup and checksum validation run in the tagged GitHub release workflow before stable publication. Live accounts, OBS Canvas playback and manual Windows installation/capture remain unverified.
 - The standalone songrequest.cs action and unrelated local upstream edits are excluded from the release commit.
+
+## Saved mixed stream playlists
+
+- Linux/WSL, Node 24.11.0: typecheck, lint, 62 unit/contract tests and production build passed. The storage round-trip check was extended and rerun successfully for a saved mixed playlist and active selection.
+- Library checks cover provider-ID deduplication, independent saved ordering and playback rotation, active edits/deletion without interrupting the current song, request → personal → mixed base scheduling, banned tracks, paused restoration, invalid-edit preservation, IPC validation and migration of older base-only state.
+- All 30 Chromium UI checks passed across three desktop sizes, including saved mixed playlist controls, keyboard ordering boundaries, navigation and overflow checks.
+- Real Castlabs Electron smoke passed mixed playlist creation, Spotify and YouTube import appends, stream activation, reorder, reload persistence, rename, failed-import preservation, removal and stopping through the real UI/validated IPC/provider parsers. The library screenshot was inspected. Existing setup, OAuth, clipboard, isolation and OBS checks also passed.
+- Provider responses in automated tests are controlled fixtures. Real-account audio/provider switching and Windows installed playback remain unverified for this change. No version bump or release is included.

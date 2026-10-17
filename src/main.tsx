@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import * as Switch from "@radix-ui/react-switch";
 import { Button } from "./components/ui/button";
+import { PlaylistLibrary } from "./PlaylistLibrary";
 import {
   key,
   type Snapshot,
@@ -370,7 +371,7 @@ function App() {
       </p>
       <Field
         label="Base playlist URL"
-        hint="Public or unlisted YouTube playlists, or Spotify playlists you own or collaborate on. Up to 1,000 entries. A successful import replaces the base playlist."
+        hint="Public or unlisted YouTube playlists, or Spotify playlists you own or collaborate on. Up to 1,000 entries. A successful import replaces the stream playlist selection. Use Your playlists in Listening to save and mix imports."
       >
         <input
           value={playlist}
@@ -769,11 +770,14 @@ function App() {
                     : "saved",
               )}
               {page === "Listening" && (
-                <section className="section">
-                  <h2>When the queues are quiet</h2>
-                  {baseForm}
-                  {rows(s.base, "base")}
-                </section>
+                <>
+                  <PlaylistLibrary state={s} busy={busy} send={send} />
+                  <section className="section">
+                    <h2>When the queues are quiet</h2>
+                    {baseForm}
+                    {rows(s.base, "base")}
+                  </section>
+                </>
               )}
             </>
           )}

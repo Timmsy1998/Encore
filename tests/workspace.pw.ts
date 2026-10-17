@@ -344,3 +344,30 @@ test("Canvas follows playback silently, cleans up and falls back to covers", asy
   await expect(page.locator("main").first()).toBeHidden();
   await expect(page.locator("iframe")).toHaveCount(0);
 });
+
+
+test("saved mixed playlist controls fit desktop scaling and survive navigation", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(async () => {
+    const state = await window.encore.snapshot();
+    const id = "11111111-1111-4111-8111-111111111111";
+    state.playlists = [{ id, name: "Mixed stream", tracks: [
+      { id: "a".repeat(22), source: "spotify", title: "Spotify favourite", author: "Artist", duration: 180, user: "Auto" },
+      { id: "abcdefghijk", source: "youtube", title: "YouTube exclusive", author: "Artist", duration: 180, user: "Auto" },
+    ] }];
+    state.activePlaylistId = id;
+    state.base = state.playlists[0].tracks;
+    localStorage.setItem("fixture-state", JSON.stringify(state));
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Listening", exact: true }).click();
+  const library = page.getByRole("region", { name: "Saved playlists" });
+  await expect(library.getByRole("status")).toHaveText("Stream playlist: Mixed stream");
+  await expect(library.getByRole("listitem")).toHaveCount(2);
+  await expect(library.getByRole("button", { name: "Move Spotify favourite up", exact: true })).toBeDisabled();
+  await expect(library.getByRole("button", { name: "Move YouTube exclusive down", exact: true })).toBeDisabled();
+  expect(await page.locator(".content").evaluate(e => e.scrollWidth <= e.clientWidth + 1)).toBe(true);
+  await page.getByRole("button", { name: "Queue", exact: true }).click();
+  await page.getByRole("button", { name: "Listening", exact: true }).click();
+  await expect(library.getByRole("listitem")).toHaveCount(2);
+});

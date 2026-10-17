@@ -819,3 +819,13 @@ code {
   background: #3a4146;
   border-radius: 8px;
 }
+
+.playlist-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; align-items: center; }
+.playlist-controls input { flex: 1 1 200px; min-width: 0; }
+.playlist-library select { width: 100%; min-width: 0; padding: 9px 11px; border: 1px solid #383e42; border-radius: 4px; background: #191c1f; color: #ecebe8; font: inherit; }
+.playlist-library select:focus-visible { outline: 2px solid #efbb88; outline-offset: 4px; }
+.playlist-tracks { list-style: none; padding: 0; }
+.playlist-tracks li { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #252a2e; }
+.playlist-song { flex: 1; min-width: 0; }
+.playlist-song strong, .playlist-song > span { display: block; overflow-wrap: anywhere; }
+.playlist-song > span { color: #8c969c; font-size: 12px; }

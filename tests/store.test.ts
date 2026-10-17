@@ -25,8 +25,17 @@ it("atomically writes validated state and reloads preferences", () => {
   const s = store();
   const data = defaults();
   data.settings.volume = 36;
+  const id = "11111111-1111-4111-8111-111111111111";
+  data.playlists = [{ id, name: "Mixed stream", tracks: [
+    { id: "a".repeat(22), source: "spotify", title: "Song", author: "Artist", duration: 180, user: "Auto" },
+    { id: "abcdefghijk", source: "youtube", title: "Exclusive", author: "Artist", duration: 180, user: "Auto" },
+  ] }];
+  data.activePlaylistId = id;
+  data.base = data.playlists[0].tracks;
+
   s.save(data);
   expect(s.load().settings.volume).toBe(36);
+  expect(s.load()).toEqual(data);
   expect(readdirSync(s.directory)).toEqual(["state.json"]);
   expect(
     JSON.parse(readFileSync(join(s.directory, "state.json"), "utf8")),

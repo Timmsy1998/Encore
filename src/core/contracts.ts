@@ -77,6 +77,11 @@ const SettingsPatchSchema = z.object(
     >;
   },
 );
+export const PlaylistSchema = z.object({
+  id: z.uuid(),
+  name: z.string().trim().min(1).max(80),
+  tracks: z.array(TrackSchema).max(10000),
+});
 export const StateSchema = z.object({
   version: z.literal(1),
   settings: SettingsSchema,
@@ -89,11 +94,16 @@ export const StateSchema = z.object({
     })
     .nullable()
     .default(null),
+  playlists: z.array(PlaylistSchema).max(100).refine(
+    items => new Set(items.map(item => item.id)).size === items.length,
+    "Playlist IDs must be unique",
+  ).default([]),
+  activePlaylistId: z.uuid().nullable().default(null),
   base: z.array(TrackSchema).max(10000),
   favorites: z.array(TrackSchema).max(10000),
   history: z.array(TrackSchema).max(1000),
   banned: z.array(z.string().max(100)).max(10000),
-});
+}).refine(state => state.activePlaylistId === null || state.playlists.some(item => item.id === state.activePlaylistId), "Active playlist must exist in the library");
 export type SavedState = z.infer<typeof StateSchema>;
 export type Snapshot = SavedState & {
   current: Track | null;
@@ -113,6 +123,13 @@ export type Snapshot = SavedState & {
   updateReady?: boolean;
 };
 export const CommandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("playlistCreate"), id: z.uuid(), name: z.string().trim().min(1).max(80) }),
+  z.object({ type: z.literal("playlistRename"), id: z.uuid(), name: z.string().trim().min(1).max(80) }),
+  z.object({ type: z.enum(["playlistDelete", "playlistActivate"]), id: z.uuid() }),
+  z.object({ type: z.literal("playlistStop") }),
+  z.object({ type: z.enum(["playlistAdd", "playlistImport"]), id: z.uuid(), input: z.string().trim().min(1).max(1000) }),
+  z.object({ type: z.literal("playlistRemove"), id: z.uuid(), key: z.string().max(100) }),
+  z.object({ type: z.literal("playlistMove"), id: z.uuid(), from: z.number().int().nonnegative(), to: z.number().int().nonnegative() }),
   z.object({ type: z.literal("settings"), settings: SettingsPatchSchema }),
   z.object({
     type: z.literal("secrets"),
@@ -189,6 +206,8 @@ export function defaults(): SavedState {
     settings: SettingsSchema.parse({}),
     queue: [],
     base: [],
+    playlists: [],
+    activePlaylistId: null,
     favorites: [],
     history: [],
     banned: [],
