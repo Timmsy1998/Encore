@@ -1,6 +1,6 @@
 {
   "name": "encore-desktop",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Desktop song request control for Streamer.bot, based on Better Song Request",
   "author": "Encore contributors; upstream HackMe_",

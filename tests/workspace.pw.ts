@@ -14,7 +14,7 @@ async function boot(page: Page, setup = false) {
     secureStorage: false,
     overlayUrl: "http://127.0.0.1:17843/overlay.html",
     dataPath: "Development fixture",
-    appVersion: "0.1.0",
+    appVersion: "1.0.0",
     importStatus: "Not checked",
   };
   state.settings.setupComplete = !setup;
