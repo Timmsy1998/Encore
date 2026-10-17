@@ -98,3 +98,7 @@ No release tag, push or publication was performed. Local commits exclude brief.m
 - All 30 Chromium UI checks passed across three desktop sizes, including saved mixed playlist controls, keyboard ordering boundaries, navigation and overflow checks.
 - Real Castlabs Electron smoke passed mixed playlist creation, Spotify and YouTube import appends, stream activation, reorder, reload persistence, rename, failed-import preservation, removal and stopping through the real UI/validated IPC/provider parsers. The library screenshot was inspected. Existing setup, OAuth, clipboard, isolation and OBS checks also passed.
 - Provider responses in automated tests are controlled fixtures. Real-account audio/provider switching and Windows installed playback remain unverified for this change. No version bump or release is included.
+
+## Playback confirmation — 17 October 2026
+
+The maintainer confirmed that all playback is working. This is user-reported playback verification; the automated provider checks described above use controlled responses. Earlier notes about unverified playback describe the status when those checks were recorded.
