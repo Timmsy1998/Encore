@@ -8,6 +8,8 @@ Create a Spotify developer app with Web Playback SDK access and register the red
 
 [Web Playback SDK](https://developer.spotify.com/documentation/web-playback-sdk) creates the named Encore device. [PKCE](https://developer.spotify.com/documentation/web-api/tutorials/code-pkce-flow) authorization uses the system browser, random state, S256 and a one-use expiring verifier. The exact [loopback redirect](https://developer.spotify.com/documentation/web-api/concepts/redirect_uri) is `http://127.0.0.1:17843/callback`. Main retains refresh tokens; only a scoped access token reaches the isolated SDK page through an authenticated endpoint. Playback commands specify Encore's own SDK device ID and never choose an arbitrary active device.
 
+Playlist imports use Spotify's current `/playlists/{id}/items` endpoint. In Development Mode, the connected account must own or collaborate on the playlist; following or saving another user's playlist does not grant API access. See the [February 2026 migration guide](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide). Import skips unavailable tracks, local files and episodes and reads up to 1,000 playlist entries. Existing saved base tracks remain intact if import fails.
+
 Stock Electron is not assumed to supply Widevine. The runtime downloader pins Castlabs ECS `44.5.1+wvcus` and verifies the release archive hash before extraction. [Castlabs EVS documentation](https://github.com/castlabs/electron-releases/wiki/EVS) requires VMP signing for production Windows/macOS packages. The build hook signs Windows after Authenticode, before archive creation. Linux smoke does not establish Windows DRM support. Spotify's supported-browser list does not name Electron; a successful CDM initialization or account login is not proof of playable audio.
 
 Premium, developer-app access/account allowlisting, working Widevine and an SDK `ready` event are required. SDK errors are surfaced and playback paused. Local SDK state sampling every two seconds detects completion without Web API polling. End events carry track/generation identity and are deduplicated by main. Provider changes pause the outgoing source before starting the next.
@@ -17,6 +19,8 @@ Premium, developer-app access/account allowlisting, working Widevine and an SDK 
 ## YouTube
 
 [Official IFrame API](https://developers.google.com/youtube/iframe_api_reference) runs from the fixed HTTP loopback origin in a sandboxed WebContentsView. No downloads, stream extraction, certificate overrides or disabled browser security are used. Preserve origin/Referer and the visible video: [required minimum functionality](https://developers.google.com/youtube/terms/required-minimum-functionality). Autoplay, embedding restrictions, removed videos, live streams and quotas remain provider-controlled. Metadata comes from YouTube Data API v3; a successful API test does not establish playback acceptance.
+
+Playlist imports require a public or unlisted YouTube playlist and a configured Data API key. Metadata is fetched in batches using [videos.list](https://developers.google.com/youtube/v3/docs/videos/list), preserving playlist order and skipping missing, non-embeddable, live/upcoming and overlong entries. Quota and network errors abort the import and preserve the saved base playlist. The import button shows progress and the result.
 
 ## Audio and OBS
 

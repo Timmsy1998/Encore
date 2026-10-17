@@ -130,6 +130,8 @@ function App() {
     [password, setPassword] = useState(""),
     [apiKey, setApiKey] = useState(""),
     [playlist, setPlaylist] = useState(""),
+    [importingPlaylist, setImportingPlaylist] = useState(false),
+    [playlistResult, setPlaylistResult] = useState(""),
     [drag, setDrag] = useState<number>();
   const [draft, setDraft] = useState<Partial<Settings>>({});
   useEffect(() => {
@@ -355,7 +357,7 @@ function App() {
       </p>
       <Field
         label="Base playlist URL"
-        hint="YouTube or Spotify playlist, up to 1,000 accessible tracks. Import replaces the base playlist."
+        hint="Public or unlisted YouTube playlists, or Spotify playlists you own or collaborate on. Up to 1,000 entries. A successful import replaces the base playlist."
       >
         <input
           value={playlist}
@@ -364,12 +366,28 @@ function App() {
         />
       </Field>
       <Button
-        disabled={busy || !playlist.trim()}
-        onClick={() => send({ type: "base", input: playlist })}
+        disabled={busy || importingPlaylist || !playlist.trim()}
+        onClick={async () => {
+          setImportingPlaylist(true);
+          setPlaylistResult("");
+          try {
+            const imported = await send({ type: "base", input: playlist });
+            setPlaylistResult(
+              imported
+                ? "Playlist imported."
+                : "Import failed. See the error above; your saved playlist is unchanged.",
+            );
+          } finally {
+            setImportingPlaylist(false);
+          }
+        }}
       >
-        Import playlist
+        {importingPlaylist ? "Importing playlist…" : "Import playlist"}
       </Button>
-      <p className="muted">{s.base.length} base tracks saved</p>
+      <p role="status" className="muted">
+        {importingPlaylist ? "Fetching playlist tracks…" : playlistResult}{" "}
+        {s.base.length} base tracks saved
+      </p>
     </>
   );
   const overlayForm = (

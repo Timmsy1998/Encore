@@ -34,6 +34,10 @@ async function boot(page: Page, setup = false, updateReady = false) {
       },
       command: async (c) => {
         if (c.type === "settings") Object.assign(state.settings, c.settings);
+        if (c.type === "base") {
+          if (c.input.includes("missing")) throw Error("Playlist unavailable: test fixture.");
+          state.base = [{ id: "abcdefghijk", source: "youtube", title: "Imported fixture", author: "Fixture", duration: 180, user: "Auto" }];
+        }
         if (c.type === "request" || c.type === "listen")
           throw Error("Provider unavailable: development test fixture.");
         localStorage.setItem("fixture-state", JSON.stringify(state));
@@ -126,4 +130,31 @@ test("downloaded update stays available across navigation and restarts only on r
   expect(await page.evaluate(() => localStorage.getItem("restart-requested"))).toBeNull();
   await restart.click();
   await expect.poll(() => page.evaluate(() => localStorage.getItem("restart-requested"))).toBe("yes");
+});
+
+test("playlist imports show progress, completion and failure without losing saved tracks", async ({ page }) => {
+  await boot(page);
+  await page.getByRole("button", { name: "Listening", exact: true }).click();
+  await page.evaluate(() => {
+    const command = window.encore.command;
+    window.encore.command = async value => {
+      if (value.type === "base")
+        await new Promise<void>(resolve => window.addEventListener("finish-import", () => resolve(), { once: true }));
+      await command(value);
+    };
+  });
+  const input = page.getByLabel("Base playlist URL");
+  await input.fill("https://www.youtube.com/playlist?list=PLabcdefghijk");
+  await page.getByRole("button", { name: "Import playlist", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Importing playlist…" })).toBeDisabled();
+  await expect(page.getByText("Fetching playlist tracks…", { exact: false })).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event("finish-import")));
+  await expect(page.getByText("Playlist imported. 1 base tracks saved")).toBeVisible();
+  await input.fill("https://www.youtube.com/playlist?list=PLmissing000");
+  await page.getByRole("button", { name: "Import playlist", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Importing playlist…" })).toBeDisabled();
+  await page.evaluate(() => window.dispatchEvent(new Event("finish-import")));
+  await expect(page.getByRole("alert")).toContainText("Playlist unavailable");
+  await expect(page.getByText("your saved playlist is unchanged", { exact: false })).toBeVisible();
+  await expect(page.getByText("Imported fixture", { exact: true })).toBeVisible();
 });

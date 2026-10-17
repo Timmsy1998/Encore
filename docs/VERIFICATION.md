@@ -42,3 +42,12 @@ No real Spotify/YouTube account, Streamer.bot installation, OBS session, signing
 Before stable distribution, complete the [Windows/account checklist](RELEASE.md), including installed and portable playback, provider switching, natural end, refresh, secure storage, OBS capture and installer/uninstaller behaviour. Spotify DRM signing and cross-service permission remain gates. YouTube uses the visible official video player; this is not an iframe-free audio implementation.
 
 No release tag, push or publication was performed. Local commits exclude brief.md, AGENTS.md, credentials, user data, generated build output and unrelated existing edits.
+
+
+## Playlist import fix checks (after v1.0.1)
+
+- Spotify uses the current playlist-items endpoint and item field, retaining compatibility with legacy track fields. Tests cover pagination, inaccessible/local/episode filtering, empty/malformed responses and safe access errors.
+- YouTube metadata is batched per playlist page, preserving playlist order and skipping missing, non-embeddable and live/untimed entries. Quota errors abort rather than silently truncating the import.
+- Node 24.11.0 on Linux/WSL: TypeScript, ESLint, all 44 unit/contract tests and production build passed. Twelve Chromium UI checks passed across the three display sizes, including pending/completed/failed imports and retaining saved tracks.
+- Real Castlabs Electron smoke imported Spotify and YouTube playlists from the setup UI through validated IPC and provider parsing. It exercised a one-use Spotify OAuth callback with controlled token/API responses, verified setup progress stayed at step 5, and confirmed a failed YouTube import retained the previous saved playlist. Existing clipboard/setup/isolation checks also passed.
+- These controlled responses do not verify real accounts or the user's exact playlists. Windows/account checks remain unrun for this fix. No new release has been published for these changes.

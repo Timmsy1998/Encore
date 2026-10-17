@@ -1,10 +1,16 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import { TrackSchema, type Track } from "../src/core/contracts";
 export const redirectUri = "http://127.0.0.1:17843/callback";
+class ProviderHttpError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+  }
+}
 async function json(url: string, init: RequestInit = {}) {
   const res = await fetch(url, { ...init, signal: AbortSignal.timeout(12000) });
   if (!res.ok)
-    throw Error(
+    throw new ProviderHttpError(
+      res.status,
       `Provider returned ${res.status}. ${res.status === 401 ? "Reconnect your account." : res.status === 403 ? "Check API access, quota and Premium requirements." : res.status === 404 ? "The Encore browser player is not ready. Check Spotify connection and DRM support." : "Try again or check the provider dashboard."}`,
     );
   return res.status === 204 ? null : res.json();
@@ -176,15 +182,21 @@ export class Providers {
       part: "snippet,contentDetails,status",
       id,
     });
-    const item = data.items?.[0];
-    if (!item || !item.status.embeddable)
+    const track = this.youtubeTrack(data.items?.[0], id, user);
+    if (!track)
       throw Error("This video is unavailable or cannot be embedded.");
-    const d = item.contentDetails.duration.match(
-      /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/,
+    return track;
+  }
+  private youtubeTrack(item: any, id: string, user: string): Track | null {
+    if (!item?.status?.embeddable) return null;
+    const d = item.contentDetails?.duration?.match(
+      /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/,
     );
     const duration = d
       ? Number(d[1] ?? 0) * 3600 + Number(d[2] ?? 0) * 60 + Number(d[3] ?? 0)
       : 0;
+    // Live/upcoming streams and overlong videos cannot enter a timed queue.
+    if (duration <= 0 || duration > 86400) return null;
     return TrackSchema.parse({
       source: "youtube",
       id,
@@ -210,12 +222,36 @@ export class Providers {
       if (!id) throw Error("Invalid Spotify playlist.");
       let offset = 0;
       for (let page = 0; page < 20; page++) {
-        const data = await this.spotify(
-          `/playlists/${id}/tracks?limit=50&offset=${offset}`,
-        );
-        for (const entry of data.items ?? [])
-          if (entry.track?.id)
-            tracks.push(this.spotifyTrack(entry.track, "Auto"));
+        let data;
+        try {
+          data = await this.spotify(
+            `/playlists/${id}/items?limit=50&offset=${offset}`,
+          );
+        } catch (error) {
+          if (
+            error instanceof ProviderHttpError &&
+            (error.status === 403 || error.status === 404)
+          )
+            throw Error(
+              `Spotify playlist import failed (${error.status}). Check the playlist link and connect the account that owns or collaborates on it. Development Mode apps cannot read other playlists; following a playlist is not enough.`,
+            );
+          throw error;
+        }
+        if (!Array.isArray(data?.items))
+          throw Error("Spotify returned an invalid playlist response. Try again.");
+        for (const entry of data.items) {
+          // Extended Quota responses may still use the previous track field.
+          const track = entry && ("item" in entry ? entry.item : entry.track);
+          if (
+            !track?.id ||
+            entry.is_local ||
+            track.is_local ||
+            track.is_playable === false ||
+            (track.type && track.type !== "track")
+          )
+            continue;
+          tracks.push(this.spotifyTrack(track, "Auto"));
+        }
         if (!data.next) break;
         offset += 50;
       }
@@ -233,26 +269,42 @@ export class Providers {
       throw Error("Invalid YouTube playlist.");
     let token = "";
     for (let page = 0; page < 20; page++) {
-      const data = await this.youtube("playlistItems", {
-        part: "contentDetails",
-        playlistId: id,
-        maxResults: "50",
-        ...(token ? { pageToken: token } : {}),
-      });
-      for (const entry of data.items ?? []) {
-        try {
-          tracks.push(
-            await this.resolve(
-              "https://youtu.be/" + entry.contentDetails.videoId,
-              "Auto",
-            ),
+      let data;
+      try {
+        data = await this.youtube("playlistItems", {
+          part: "contentDetails",
+          playlistId: id,
+          maxResults: "50",
+          ...(token ? { pageToken: token } : {}),
+        });
+      } catch (error) {
+        if (error instanceof ProviderHttpError && error.status === 404)
+          throw Error(
+            "YouTube playlist not found. Use a public or unlisted playlist link; private playlists require account access that Encore does not support.",
           );
-        } catch (error) {
-          if (
-            !(error instanceof Error) ||
-            error.message !== "This video is unavailable or cannot be embedded."
-          )
-            throw error; /* Skip genuinely unavailable videos; quota/network failures abort. */
+        throw error;
+      }
+      if (!Array.isArray(data?.items))
+        throw Error("YouTube returned an invalid playlist response. Try again.");
+      const ids: string[] = data.items
+        .map((entry: any) => entry?.contentDetails?.videoId)
+        .filter(
+          (id: unknown): id is string =>
+            typeof id === "string" && /^[\w-]{11}$/.test(id),
+        );
+      if (ids.length) {
+        const videos = await this.youtube("videos", {
+          part: "snippet,contentDetails,status",
+          id: [...new Set(ids)].join(","),
+        });
+        if (!Array.isArray(videos?.items))
+          throw Error("YouTube returned an invalid video response. Try again.");
+        const byId = new Map<string, any>(
+          videos.items.map((item: any) => [item.id, item]),
+        );
+        for (const videoId of ids) {
+          const track = this.youtubeTrack(byId.get(videoId), videoId, "Auto");
+          if (track) tracks.push(track);
         }
       }
       token = data.nextPageToken;

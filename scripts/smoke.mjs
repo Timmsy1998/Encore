@@ -1,4 +1,4 @@
-// Real Electron smoke test; no provider accounts or test tracks are injected.
+// Real Electron smoke test; provider responses below are controlled fixtures, not account verification.
 import { _electron as electron, expect } from "@playwright/test";
 import { resolve } from "node:path";
 import { mkdtemp, rm, mkdir } from "node:fs/promises";
@@ -108,6 +108,53 @@ try {
       .toBe(5);
     expect((await window.evaluate(() => window.encore.snapshot())).settings.clientId)
       .toBe("a".repeat(32));
+    // Exercise both playlist buttons through real IPC/provider parsing, including
+    // OAuth callback, replacement and failure preservation. No live account used.
+    await app.evaluate(() => {
+      globalThis.encoreSmokeFetch = globalThis.fetch;
+      globalThis.fetch = async (url, init) => {
+        const address = new URL(String(url));
+        let body;
+        let status = 200;
+        if (address.href === "https://accounts.spotify.com/api/token")
+          body = { access_token: "smoke-access", refresh_token: "smoke-refresh", expires_in: 3600 };
+        else if (address.hostname === "api.spotify.com" && address.pathname.endsWith("/items"))
+          body = { items: [{ item: { id: "b".repeat(22), type: "track", name: "Spotify import smoke", artists: [{ name: "Fixture" }], duration_ms: 180000 } }] };
+        else if (address.hostname === "www.googleapis.com" && address.pathname.endsWith("/playlistItems")) {
+          if (address.searchParams.get("playlistId") === "PLmissing000") { body = {}; status = 404; }
+          else body = { items: [{ contentDetails: { videoId: "abcdefghijk" } }] };
+        } else if (address.hostname === "www.googleapis.com" && address.pathname.endsWith("/videos"))
+          body = { items: [{ id: "abcdefghijk", status: { embeddable: true }, snippet: { title: "YouTube import smoke", channelTitle: "Fixture" }, contentDetails: { duration: "PT3M" } }] };
+        else return globalThis.encoreSmokeFetch(url, init);
+        return new Response(JSON.stringify(body), { status });
+      };
+    });
+    try {
+      const callback = new URL("http://127.0.0.1:17843/callback");
+      callback.searchParams.set("state", authUrl.searchParams.get("state"));
+      callback.searchParams.set("code", "smoke-code");
+      expect((await fetch(callback)).status).toBe(200);
+      for (const [url, source] of [
+        ["https://open.spotify.com/playlist/" + "a".repeat(22), "spotify"],
+        ["https://www.youtube.com/playlist?list=PLabcdefghijk", "youtube"],
+      ]) {
+        await window.getByLabel("Base playlist URL").fill(url);
+        await window.getByRole("button", { name: "Import playlist", exact: true }).click();
+        await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).base[0]?.source).toBe(source);
+        await expect(window.getByText("Playlist imported. 1 base tracks saved")).toBeVisible();
+        expect((await window.evaluate(() => window.encore.snapshot())).settings.setupStep).toBe(5);
+      }
+      await window.getByLabel("Base playlist URL").fill("https://www.youtube.com/playlist?list=PLmissing000");
+      await window.getByRole("button", { name: "Import playlist", exact: true }).click();
+      await expect(window.getByRole("alert")).toContainText("YouTube playlist not found");
+      expect((await window.evaluate(() => window.encore.snapshot())).base[0]?.title).toBe("YouTube import smoke");
+    } finally {
+      await app.evaluate(() => {
+        globalThis.fetch = globalThis.encoreSmokeFetch;
+        delete globalThis.encoreSmokeFetch;
+      });
+    }
+
   } finally {
     await app.evaluate(({ shell }) => {
       shell.openExternal = globalThis.encoreSmokeOpenExternal;
@@ -143,7 +190,7 @@ try {
   );
   if (!denied) throw Error("Node unexpectedly exposed in renderer");
   console.log(
-    "Electron startup, preload, empty paused state, Streamer.bot/YouTube/Spotify setup saves, authorization launch, navigation and native clipboard passed.",
+    "Electron startup, preload, empty paused state, Streamer.bot/YouTube/Spotify setup saves, authorization launch, Spotify/YouTube playlist imports, failure preservation, navigation and native clipboard passed.",
   );
 } finally {
   await app.close();
