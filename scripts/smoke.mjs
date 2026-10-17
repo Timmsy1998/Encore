@@ -197,7 +197,7 @@ try {
       if (!sourceUrl.includes("?preset=")) throw Error("Missing independent overlay URL");
       await window.getByLabel("Overlay style", { exact: true }).selectOption("card");
       const secondId = await app.evaluate(async ({ BrowserWindow }, url) => {
-        const view = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+        const view = new BrowserWindow({ width: 960, height: 1100, show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
         await view.loadURL(url + "&test=1");
         return view.id;
       }, sourceUrl);
@@ -205,6 +205,14 @@ try {
       if (!second) throw Error("Second OBS overlay did not load");
       try {
         await expect(second.locator("main")).toHaveClass(/card/);
+        await window.getByLabel("Overlay layout", { exact: true }).selectOption("vertical");
+        await window.getByRole("switch", { name: "Spinning vinyl artwork", exact: true }).click();
+        await expect(second.locator("main")).toHaveClass(/vertical vinyl/);
+        await expect(second.locator(".encore-art")).toHaveCSS("animation-play-state", "running");
+        await expect(overlay.locator("main")).toHaveClass(/horizontal/);
+        await expect(second.locator("small")).toHaveText("PREVIEW");
+        await second.locator("main").evaluate(async el => { await Promise.all(el.getAnimations().map(animation => animation.finished)); });
+        await second.screenshot({ path: "test-results/electron-overlay-gallery.png" });
         await expect(overlay.locator("main")).toHaveClass(/minimal/);
         await window.getByLabel("Overlay name", { exact: true }).fill("Second box");
         await window.getByRole("button", { name: "Save name", exact: true }).click();

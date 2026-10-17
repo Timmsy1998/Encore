@@ -18,6 +18,8 @@ export const OverlayAppearanceSchema = z.object({
     .regex(/^#[a-fA-F0-9]{6}$/)
     .default("#e5aa73"),
   overlayCompact: z.boolean().default(false),
+  overlayLayout: z.enum(["horizontal", "vertical"]).default("horizontal"),
+  overlayVinyl: z.boolean().default(false),
   overlayTheme: z.enum(["card", "glass", "minimal"]).default("card"),
   overlayBackground: z.string().regex(/^#[a-fA-F0-9]{6}$/).default("#17191f"),
   overlayText: z.string().regex(/^#[a-fA-F0-9]{6}$/).default("#ffffff"),

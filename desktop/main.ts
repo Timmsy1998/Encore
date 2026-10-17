@@ -103,6 +103,7 @@ function publicState(presetId?: string) {
   const appearance = overlayAppearance(queue.state.settings, presetId);
   return {
     current: queue.current,
+    currentLane: queue.currentLane,
     playing: queue.playing,
     generation,
     trackGeneration,

@@ -65,3 +65,9 @@ No release tag, push or publication was performed. Local commits exclude brief.m
 - Node 24.11.0 on Linux/WSL: TypeScript, ESLint, all 47 unit/contract tests, production build and 21 Chromium checks passed. Coverage includes old-settings migration, validated unique preset IDs, independent styles, rename URL stability, persisted designs and deletion.
 - Real Castlabs Electron smoke passed with two simultaneous sandboxed windows loading actual loopback overlay URLs. Editing a saved design updated its window while the default stayed unchanged; renaming preserved its URL, native clipboard copied that URL, and deletion hid only that source. Existing setup, controlled provider import and isolation checks also passed.
 - Manual Windows OBS capture and live provider accounts were not exercised for this change. No new release was published for these changes.
+
+## Gallery layouts and overlay motion
+
+- Node 24.11.0 on Linux/WSL: TypeScript, ESLint, 47 unit/contract tests, production build and 24 Chromium checks passed. Older settings retain horizontal artwork; independent presets persist vertical layout and vinyl options. Browser checks cover request/listening/base attribution, omitted platform names, playback-aware vinyl/equalizer animation, song crossfades, progress updates without repeated transitions, and reduced motion.
+- Real Castlabs Electron smoke passed live horizontal and vertical/vinyl overlays in separate sandboxed windows, alongside setup, controlled playlist imports, clipboard and isolation checks. The gallery screenshot was inspected, including fallback vinyl artwork. The global Working indicator was removed; operation errors and specific import feedback remain available.
+- Windows OBS capture and real-account audio were not exercised for this change. No new release was published.

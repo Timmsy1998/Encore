@@ -1,1 +1,1 @@
-export function renderOverlay(box: HTMLElement, state: { current?: unknown; playing?: boolean; appearance?: unknown; progress?: unknown }, demo?: boolean): void;
+export function renderOverlay(box: HTMLElement, state: { current?: unknown; currentLane?: string | null; trackGeneration?: number; playing?: boolean; appearance?: unknown; progress?: unknown }, demo?: boolean): void;

@@ -163,6 +163,8 @@ test("overlay customisation persists and matches the OBS renderer", async ({ pag
   await boot(page);
   await page.getByRole("button", { name: "Overlay", exact: true }).click();
   await page.getByLabel("Overlay style", { exact: true }).selectOption("glass");
+  await page.getByLabel("Overlay layout", { exact: true }).selectOption("vertical");
+  await page.getByRole("switch", { name: "Spinning vinyl artwork", exact: true }).click();
   await page.getByLabel("Accent colour", { exact: true }).fill("#70e0cc");
   await page.getByRole("switch", { name: "Show artwork", exact: true }).click();
   await page.getByRole("switch", { name: "Compact layout", exact: true }).click();
@@ -174,6 +176,7 @@ test("overlay customisation persists and matches the OBS renderer", async ({ pag
   await page.getByRole("button", { name: "Overlay", exact: true }).click();
   await expect(page.getByLabel("Overlay style", { exact: true })).toHaveValue("glass");
   await expect(preview).toHaveCSS("--accent", "#70e0cc");
+  await expect(preview).toHaveClass(/vertical vinyl/);
 });
 
 test("OBS overlay shows provider progress, safe metadata, and live appearance", async ({ page }) => {
@@ -217,4 +220,53 @@ test("saved overlays have independent designs, stable URLs and persistent names"
   await page.getByRole("button", { name: "Delete overlay", exact: true }).click();
   await expect(url).toHaveValue(original);
   await expect(page.getByRole("option", { name: "Compact stream box" })).toHaveCount(0);
+});
+
+
+test("overlay gallery, vinyl, request attribution and transitions follow live playback", async ({ page }) => {
+  const model = { current: { id: "youtube001", source: "youtube", title: "First song", author: "Artist", user: "Viewer", duration: 180 }, currentLane: "listening", trackGeneration: 1, playing: true, appearance: { overlayLayout: "vertical", overlayVinyl: true }, progress: { position: 42, observedAt: Date.now(), active: false } };
+  await page.route("**/now", route => route.fulfill({ json: model }));
+  await page.route("**/events", route => route.fulfill({ contentType: "text/event-stream", body: "data: connected\n\n" }));
+  await page.route("https://i.ytimg.com/**", route => route.abort());
+  await page.goto("/overlay.html");
+  const card = page.locator("main:not([data-transition])");
+  await expect(card).toHaveClass(/vertical vinyl/);
+  await expect(card.locator(".encore-requester")).toBeHidden();
+  await expect(card.locator("small")).toHaveText("NOW PLAYING");
+  await expect(card.locator(".encore-art")).toHaveCSS("animation-play-state", "running");
+  await expect(card.locator(".encore-bars i").first()).toHaveCSS("animation-play-state", "running");
+  model.currentLane = "request";
+  await expect(card.locator(".encore-requester")).toHaveText("Requested by Viewer");
+  await expect(card.locator(".encore-requester")).toBeVisible();
+  await page.evaluate(() => {
+    document.body.dataset.transitions = "0";
+    new MutationObserver(records => {
+      for (const record of records) for (const node of record.addedNodes) {
+        if (node instanceof HTMLElement && node.dataset.transition === "outgoing") document.body.dataset.transitions = String(Number(document.body.dataset.transitions) + 1);
+      }
+    }).observe(document.body, { childList: true });
+  });
+  // Track changes crossfade; a rapid second change must leave the latest metadata.
+  model.current = { ...model.current, id: "youtube002", title: "Second song" };
+  model.trackGeneration++;
+  await expect(card.locator("h1")).toHaveText("Second song");
+  model.current = { ...model.current, id: "youtube003", title: "Latest song" };
+  model.trackGeneration++;
+  await expect(card.locator("h1")).toHaveText("Latest song");
+  await expect(page.locator('[data-transition="outgoing"]')).toHaveCount(0);
+  await expect(page.locator("body")).toHaveAttribute("data-transitions", "2");
+  model.progress.position = 60;
+  await expect(card.locator(".encore-times")).toHaveText("1:003:00");
+  expect(await card.evaluate(el => el.getAnimations().length)).toBe(0);
+  await expect(page.locator("body")).toHaveAttribute("data-transitions", "2");
+  model.playing = false;
+  model.currentLane = "base";
+  await expect(card.locator("small")).toHaveText("PAUSED");
+  await expect(card.locator(".encore-requester")).toBeHidden();
+  await expect(card.locator(".encore-art")).toHaveCSS("animation-play-state", "paused");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(card.locator(".encore-art")).toHaveCSS("animation-name", "none");
+  model.current.title = "Reduced motion song";
+  await expect(card.locator("h1")).toHaveText("Reduced motion song");
+  expect(await card.evaluate(el => el.getAnimations().length)).toBe(0);
 });

@@ -48,7 +48,7 @@ import { renderOverlay } from "../public/overlay-renderer.js";
 function OverlayPreview({ state, appearance }: { state: Snapshot; appearance: OverlayAppearance }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (ref.current) renderOverlay(ref.current, { current: state.current, playing: state.playing, appearance }, true);
+    if (ref.current) renderOverlay(ref.current, { current: state.current, currentLane: state.currentLane, playing: state.playing, appearance }, true);
   }, [state, appearance]);
   return <div className="overlay-stage"><div ref={ref} aria-label="Overlay preview" /></div>;
 }
@@ -418,7 +418,7 @@ function App() {
   const overlayForm = (
     <>
       <p>
-        A silent now-playing overlay for OBS. Add a Browser source at 960 × 260
+        A silent now-playing overlay for OBS. Add a Browser source at 960 × 260 for horizontal cards or 960 × 1100 for vertical galleries
         and paste this URL. Changes appear live in OBS while Encore is open. Resize the source in OBS to fit your scene.
       </p>
       <Field label="Saved overlay" hint="Each overlay has its own URL and appearance. Use several Browser sources together in OBS.">
@@ -457,6 +457,9 @@ function App() {
       </Field>
       <OverlayPreview state={s} appearance={appearance} />
       <div className="overlay-controls">
+        <Field label="Overlay layout"><select aria-label="Overlay layout" value={appearance.overlayLayout} onChange={e => updateAppearance({ overlayLayout: e.target.value as Settings["overlayLayout"] })}>
+          <option value="horizontal">Horizontal</option><option value="vertical">Vertical gallery</option>
+        </select></Field>
         <Field label="Overlay style"><select aria-label="Overlay style" value={appearance.overlayTheme} onChange={e => updateAppearance({ overlayTheme: e.target.value as Settings["overlayTheme"] })}>
           <option value="card">Album card</option><option value="glass">Accent glass</option><option value="minimal">Minimal</option>
         </select></Field>
@@ -464,7 +467,7 @@ function App() {
         {([ ["overlayOpacity", "Background opacity", 0, 100, "%"], ["overlayRadius", "Corner radius", 0, 48, "px"], ["overlayWidth", "Card width", 300, 900, "px"] ] as const).map(([name, label, min, max, unit]) => <Field key={name} label={`${label} · ${appearance[name]}${unit}`}><input aria-label={label} type="range" min={min} max={max} value={appearance[name]} onChange={e => updateAppearance({ [name]: Number(e.target.value) })} /></Field>)}
       </div>
       <div className="overlay-toggles">
-        {([ ["overlayCompact", "Compact layout"], ["overlayArtwork", "Show artwork"], ["overlayProgress", "Show progress"], ["overlayRequester", "Show requester"], ["overlayHidePaused", "Hide when paused"] ] as const).map(([name, label]) => <Toggle key={name} label={label} checked={appearance[name]} onChange={v => updateAppearance({ [name]: v })} />)}
+        {([ ["overlayCompact", "Compact layout"], ["overlayArtwork", "Show artwork"], ["overlayVinyl", "Spinning vinyl artwork"], ["overlayProgress", "Show progress"], ["overlayRequester", "Show requester"], ["overlayHidePaused", "Hide when paused"] ] as const).map(([name, label]) => <Toggle key={name} label={label} checked={appearance[name]} onChange={v => updateAppearance({ [name]: v })} />)}
       </div>
       <Button variant="secondary" onClick={() => send({ type: "overlayTest", presetId })}>Open test overlay</Button>
       <p className="notice">
@@ -691,11 +694,6 @@ function App() {
               <Button disabled={busy} onClick={() => send({ type: "installUpdate" })}>
                 Restart and install
               </Button>
-            </div>
-          )}
-          {busy && (
-            <div className="working" role="status">
-              Working…
             </div>
           )}
           {["Queue", "Listening", "Favourites", "History"].includes(page) && (
