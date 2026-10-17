@@ -57,7 +57,7 @@ Open Overlay, copy the browser-source URL and use the suggested dimensions. Acce
 - **Port 17843 unavailable:** stop the conflicting process and restart Encore. The fixed loopback address is also the registered OAuth redirect.
 - **Credentials disappear after restart:** secure storage is unavailable; Encore intentionally avoids plaintext fallback. Use an OS keychain/Windows account with functioning secure storage.
 - **Damaged/unknown settings:** Encore preserves a recovery copy and shows the failure. Restore a version-1 backup; do not overwrite the only recovery copy.
-- **Updates:** About → Check for updates notifies and links to Releases. Install the replacement manually; portable users retain the adjacent data folder. No unattended updater is installed.
+- **Updates:** Installed copies check stable GitHub releases on startup and every six hours, download in the background, and offer Restart and install. About also offers a manual check. Portable users replace the executable through Releases and retain the adjacent data folder.
 
 ## Development
 
@@ -84,7 +84,7 @@ Windows packaging should run on Windows. Linux UI tests need Chromium system lib
 
 ## Known limitations
 
-Real-account playback, Windows installer/portable behaviour and OBS capture are release gates, not verified results of the automated suite. Spotify's policy restricts integration with another service's content; provider permission and broadcast rights must be resolved before distribution/use. Upstream's six translations remain in the original browser source; Encore's new UI is English only. Overlay options are accent/compact rather than all legacy themes. No progress seeking, automatic installation of updates, Linux/macOS distribution or stream downloading is provided.
+Real-account playback, Windows installer/portable behaviour and OBS capture are release gates, not verified results of the automated suite. Spotify's policy restricts integration with another service's content; provider permission and broadcast rights must be resolved before distribution/use. Upstream's six translations remain in the original browser source; Encore's new UI is English only. Overlay options are accent/compact rather than all legacy themes. No progress seeking, Linux/macOS distribution or stream downloading is provided.
 
 ## Licence and attribution
 

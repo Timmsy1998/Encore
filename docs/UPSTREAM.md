@@ -21,6 +21,7 @@ Upstream uses browser-owned state, YouTube IFrame API, Spotify PKCE/Web Playback
 | Setup tutorial                      | Eight persisted, skippable desktop steps                                                                      |
 | Backup/restore                      | Validated version-1 JSON; no credentials, atomic writes/recovery copies                                       |
 | Overlay                             | Silent, separate OBS browser process, SSE reconnect, accent/compact/test; legacy theme parity incomplete      |
+| Updates                             | Installed Windows copies download stable GitHub releases; explicit restart, portable replacement manual |
 | Languages                           | Upstream English/Polish/Ukrainian/German/French/Turkish source retained; desktop UI English only (parity gap) |
 
 Supported event names: `SONG_REQUEST`, `SPOTIFY_SONG_REQUEST`, `SONG_REQUEST_FORCE`, `GET_SONG`, `WHEN_SONG`, `QUEUE_SONGS`, `SKIP_SONG`, `VOTE_SKIP`, `WRONG_SONG`, `VOLUME`, `PLAY_SONG`, `PAUSE_SONG`, `STOP_SONG`, `IMPORT_DIAGNOSTICS`. Moderator authorization is in imported Streamer.bot actions. Diagnostic capability reports do not prove channel permissions or account playback.

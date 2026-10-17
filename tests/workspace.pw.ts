@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { defaults, type Snapshot } from "../src/core/contracts";
-async function boot(page: Page, setup = false) {
+async function boot(page: Page, setup = false, updateReady = false) {
   const state: Snapshot = {
     ...defaults(),
     current: null,
@@ -16,6 +16,8 @@ async function boot(page: Page, setup = false) {
     dataPath: "Development fixture",
     appVersion: "1.0.0",
     importStatus: "Not checked",
+    updateReady,
+    updateStatus: updateReady ? "Encore 1.0.1 is ready." : "Not checked",
   };
   state.settings.setupComplete = !setup;
   await page.addInitScript((initial) => {
@@ -106,4 +108,22 @@ test("personal listening, errors, navigation and window scaling", async ({
   await page.screenshot({
     path: `test-results/workspace-${testInfo.project.name}.png`,
   });
+});
+
+test("downloaded update stays available across navigation and restarts only on request", async ({ page }) => {
+  await boot(page, false, true);
+  const restart = page.getByRole("button", { name: "Restart and install", exact: true });
+  await expect(restart).toBeVisible();
+  await page.getByRole("button", { name: "Listening", exact: true }).click();
+  await expect(restart).toBeVisible();
+  await page.evaluate(() => {
+    const command = window.encore.command;
+    window.encore.command = async (value) => {
+      if (value.type === "installUpdate") localStorage.setItem("restart-requested", "yes");
+      await command(value);
+    };
+  });
+  expect(await page.evaluate(() => localStorage.getItem("restart-requested"))).toBeNull();
+  await restart.click();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("restart-requested"))).toBe("yes");
 });

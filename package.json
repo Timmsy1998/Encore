@@ -18,7 +18,7 @@
     "test": "vitest run",
     "build": "vite build && node scripts/build.mjs",
     "check": "npm run typecheck && npm run lint && npm test && npm run build",
-    "package:win": "npm run build && node scripts/runtime.mjs win32 && electron-builder --win --x64",
+    "package:win": "npm run build && node scripts/runtime.mjs win32 && electron-builder --win --x64 --publish never",
     "test:ui": "playwright test",
     "runtime": "node scripts/runtime.mjs",
     "test:desktop": "node scripts/smoke.mjs"
@@ -49,7 +49,11 @@
       "allowToChangeInstallationDirectory": true,
       "artifactName": "Encore-${version}-windows-${arch}-installer.${ext}"
     },
-    "publish": null,
+    "publish": {
+      "provider": "github",
+      "owner": "Timmsy1998",
+      "repo": "Encore"
+    },
     "electronVersion": "44.5.1",
     "electronDist": ".runtime/win32",
     "portable": {
@@ -62,6 +66,7 @@
     "@radix-ui/react-switch": "1.4.1",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
+    "electron-updater": "6.8.9",
     "lucide-react": "1.59.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
@@ -82,6 +87,7 @@
     "esbuild": "0.28.2",
     "eslint": "10.13.0",
     "extract-zip": "2.0.1",
+    "js-yaml": "4.3.2",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.2",

@@ -13,7 +13,7 @@ npm run package:win
 node scripts/release.mjs
 ```
 
-Both NSIS and portable executables must exist, be larger than 1 MB and have Windows executable headers before the checksum/notes script succeeds. These checks do not replace installing and running them. Output: `release/Encore-VERSION-windows-x64-installer.exe`, `release/Encore-VERSION-windows-x64-portable.exe`, `SHA256SUMS.txt`, `RELEASE-NOTES.md`. Never ship the unpacked directory as a substitute for either package.
+Both NSIS and portable executables must exist, be larger than 1 MB and have Windows executable headers before the checksum/notes script succeeds. These checks do not replace installing and running them. Output: `release/Encore-VERSION-windows-x64-installer.exe`, `release/Encore-VERSION-windows-x64-portable.exe`, `latest.yml`, installer `.blockmap`, `SHA256SUMS.txt`, `RELEASE-NOTES.md`. The verifier matches update metadata version, filename, size and SHA-512 against the installer and includes update assets in the SHA-256 manifest. Never ship the unpacked directory as a substitute for either package.
 
 ## Signing
 
@@ -27,7 +27,7 @@ Windows Spotify DRM requires production VMP signing. Register/verify a Castlabs 
 
 `release.yml` runs only for `v*` tags and rejects version mismatches. It tests the tagged checkout, builds both Windows packages, smoke-tests the unpacked packaged app, verifies outputs, hashes them, and uploads exact assets. A separate job downloads and re-verifies checksums, then publishes a **prerelease** with generated signing/DRM notes. Only that job gets `contents: write`. No code is rebuilt in the publishing job.
 
-Configure the GitHub **release** environment with required reviewers before enabling publication. This is a maintainer release gate, not an approval demanded for local development. Tag protection and environment reviewers should limit who can run trusted release builds and use signing secrets. Do not expose these secrets through pull-request workflows. Promoting a prerelease to stable is manual after the checks below. Existing tags/releases are not overwritten automatically. Update notification uses GitHub's latest stable release; previews remain available from Releases.
+Configure the GitHub **release** environment with required reviewers before enabling publication. This is a maintainer release gate, not an approval demanded for local development. Tag protection and environment reviewers should limit who can run trusted release builds and use signing secrets. Do not expose these secrets through pull-request workflows. Promoting a prerelease to stable is manual after the checks below. Existing tags/releases are not overwritten automatically. Automatic updates use stable GitHub releases; previews remain available from Releases. Keep the installer, its blockmap and latest.yml attached when promoting a release. Packaging uses --publish never; only the publishing job uploads assets.
 
 ## Required manual record before stable distribution
 
@@ -46,4 +46,8 @@ Local Windows packaging and unpacked packaged startup passed; see [the verificat
 
 ## Updating
 
-Bump `package.json` and lockfile together, verify checks and release notes, commit, then (only when authorised) create/push matching `vX.Y.Z`. Preserve corresponding source and GPL notices with distributed binaries. About offers an explicit update check and a fixed Releases link. There is no automatic download or installation; installed users run the new installer, portable users replace the EXE while retaining `Encore-data`.
+Bump `package.json` and lockfile together, verify checks and release notes, commit, then (only when authorised) create/push matching `vX.Y.Z`. Preserve corresponding source and GPL notices with distributed binaries. Installed Windows copies check after 15 seconds and every six hours, then download newer stable releases automatically. About offers an immediate check. A notice across all pages offers **Restart and install**; playback pauses and queue state is saved before restarting. Ordinary quit does not install an update. No application GitHub credentials are needed for this public repository. Update errors offer retry or manual installation through Releases.
+
+Portable copies replace the EXE manually while retaining `Encore-data`. Existing builds without this updater need one manual installer upgrade first. Use a higher package version for each subsequent release: the same version does not trigger an update. The workflow publishes prereleases, so promote a verified release to stable in GitHub before installed clients receive it.
+
+Before shipping, test with two installed versions on Windows: publish the newer version with metadata, confirm detection/download, keep playing without interruption, restart from the notice, confirm the new version opens paused with the queue preserved, and verify close-to-tray does not block installation. Exercise offline/retry, checksum failure and portable manual fallback. These installed update checks have not yet been run locally.

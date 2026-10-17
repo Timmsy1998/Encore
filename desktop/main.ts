@@ -1,4 +1,6 @@
 import * as electron from "electron";
+import { autoUpdater } from "electron-updater";
+import { Updates } from "./updates";
 import {
   app,
   BrowserWindow,
@@ -54,7 +56,7 @@ let secure = false,
   streamerbot = "Disconnected",
   error = "",
   importStatus = "Not checked";
-let updateStatus = "Updates have not been checked.";
+let updates: Updates | undefined;
 const logs: string[] = [];
 const clients = new Set<ServerResponse>();
 const playerToken = randomBytes(32).toString("hex");
@@ -90,7 +92,8 @@ function snapshot(): Snapshot {
     dataPath: store.directory,
     appVersion: app.getVersion(),
     importStatus,
-    updateStatus,
+    updateStatus: updates?.status,
+    updateReady: updates?.ready ?? false,
   };
 }
 function publicState() {
@@ -517,44 +520,18 @@ async function command(c: Command) {
         }
       }, 8000).unref();
       break;
-    case "checkUpdates": {
-      updateStatus = "Checking GitHub releases…";
-      emit();
-      try {
-        const response = await fetch(
-          "https://api.github.com/repos/Timmsy1998/Encore/releases/latest",
-          {
-            headers: { Accept: "application/vnd.github+json" },
-            signal: AbortSignal.timeout(10000),
-          },
-        );
-        if (response.status === 404)
-          updateStatus = "No stable release published yet.";
-        else {
-          if (!response.ok)
-            throw Error("Release service unavailable. Try again later.");
-          const release = (await response.json()) as { tag_name?: unknown };
-          if (
-            typeof release.tag_name !== "string" ||
-            !/^v\d+\.\d+\.\d+$/.test(release.tag_name)
-          )
-            throw Error("Release version could not be verified.");
-          const latest = release.tag_name.slice(1).split(".").map(Number);
-          const current = app.getVersion().split(".").map(Number);
-          const difference =
-            latest.map((v, i) => v - (current[i] || 0)).find((v) => v !== 0) ||
-            0;
-          updateStatus =
-            difference > 0
-              ? `Update available: ${release.tag_name}. Open Releases to download.`
-              : "Encore is up to date.";
-        }
-      } catch {
-        updateStatus =
-          "Could not check updates. Open Releases or try again later.";
+    case "checkUpdates":
+      void updates?.check();
+      break;
+    case "installUpdate":
+      if (updates?.ready) {
+        await pause();
+        save();
+        updates.install(() => {
+          quitting = true;
+        });
       }
       break;
-    }
     case "diagnostics":
       clipboard.writeText(
         JSON.stringify(
@@ -975,6 +952,14 @@ if (!app.requestSingleInstanceLock()) {
         if (!result.success) throw Error("Invalid command");
         await serial(() => command(result.data), true);
       });
+      updates = new Updates(
+        autoUpdater,
+        app.isPackaged &&
+          process.platform === "win32" &&
+          !process.env.PORTABLE_EXECUTABLE_DIR &&
+          !process.env.PORTABLE_EXECUTABLE_FILE,
+        emit,
+      );
       createMain();
       tray = new Tray(
         nativeImage
@@ -1005,6 +990,7 @@ if (!app.requestSingleInstanceLock()) {
       );
       tray.on("double-click", () => main?.show());
       bot.connect(queue.state.settings.wsPort, password);
+      updates.start();
     } catch (e) {
       dialog.showErrorBox(
         "Encore could not start",
@@ -1021,6 +1007,7 @@ const heartbeat = setInterval(() => {
 app.on("before-quit", () => {
   quitting = true;
   clearInterval(heartbeat);
+  updates?.stop();
   bot?.close();
   player?.webContents.close();
   for (const c of clients) c.end();

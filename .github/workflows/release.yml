@@ -63,6 +63,8 @@ jobs:
           path: |
             release/*-installer.exe
             release/*-portable.exe
+            release/latest.yml
+            release/*-installer.exe.blockmap
             release/SHA256SUMS.txt
             release/RELEASE-NOTES.md
           if-no-files-found: error
@@ -87,4 +89,4 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           sha256sum --check SHA256SUMS.txt
-          gh release create "$RELEASE_TAG" ./*-installer.exe ./*-portable.exe SHA256SUMS.txt --verify-tag --prerelease --title "Encore $RELEASE_TAG" --notes-file RELEASE-NOTES.md
+          gh release create "$RELEASE_TAG" ./*-installer.exe ./*-portable.exe ./*-installer.exe.blockmap latest.yml SHA256SUMS.txt --verify-tag --prerelease --title "Encore $RELEASE_TAG" --notes-file RELEASE-NOTES.md

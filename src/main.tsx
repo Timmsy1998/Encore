@@ -641,6 +641,14 @@ function App() {
               {localError || s.error}
             </div>
           )}
+          {s.updateReady && (
+            <div className="notice" role="status">
+              <p>{s.updateStatus}</p>
+              <Button disabled={busy} onClick={() => send({ type: "installUpdate" })}>
+                Restart and install
+              </Button>
+            </div>
+          )}
           {busy && (
             <div className="working" role="status">
               Working…
@@ -1047,6 +1055,7 @@ function App() {
                     Open releases
                   </Button>
                 </div>
+                <p>Installed copies check stable GitHub releases automatically and download updates in the background. Restart when you finish listening to install. Portable copies update through Open releases.</p>
                 <p>{s.updateStatus || "Updates have not been checked."}</p>
                 <Button
                   variant="secondary"

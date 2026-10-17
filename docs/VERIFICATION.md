@@ -11,6 +11,13 @@ Verified on 2026-10-17. This is a development preview, not a real-account playba
 - Both GitHub workflows passed actionlint 1.7.12 static validation. Hosted GitHub Actions have not run for these local commits.
 - Production dependency audit: zero advisories. Full development-toolchain audit: nine advisories (eight moderate, one high). The unresolved high advisory is in the development archive-extraction chain; runtime archives are pinned and hash-verified before extraction. This is a release-maintenance concern, not a claim that the complete toolchain is vulnerability-free.
 
+## GitHub updater checks
+
+- Node 24.11.0 on Linux/WSL: TypeScript, ESLint, all 31 unit/contract tests and production build passed. Updater tests cover stable-only downloads, explicit restart, in-flight deduplication, offline retry, periodic checks and unsupported-copy fallback. Release verification tests reject mismatched installer metadata.
+- Nine Chromium UI checks passed, including the update notice across navigation and explicit restart at all three display sizes. Local browser runs use cached system libraries; the first attempt lacked libnspr4. Real Electron startup/preload/paused-state smoke passed after the build completed.
+- Windows 10.0.26300 x64, Node 25.1.0, fresh temporary checkout: clean dependency installation and installer/portable packaging passed. Generated app-update.yml points at the public Encore repository. The artifact verifier matched latest.yml to the installer and hashed both update assets. Packages are unsigned and VMP signing was skipped. The updated packaged startup smoke was blocked because the existing installed Encore process owns port 17843; that running app was left open. Linux packaged-code startup passed as recorded above.
+- Production dependency audit remains clear; workflow static validation passed. Hosted publication and a two-version installed Windows update have not been exercised. See the update checklist in RELEASE.md.
+
 ## Windows and account checks
 
 - Windows 10.0.26300 x64, Node 25.1.0, in a temporary Windows checkout: clean dependency installation, TypeScript, lint, all 25 tests and production build passed.

@@ -69,6 +69,7 @@ export type Snapshot = SavedState & {
   appVersion: string;
   importStatus: string;
   updateStatus?: string;
+  updateReady?: boolean;
 };
 export const CommandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("settings"), settings: SettingsSchema.partial() }),
@@ -106,6 +107,7 @@ export const CommandSchema = z.discriminatedUnion("type", [
       "copyImport",
       "checkImport",
       "checkUpdates",
+      "installUpdate",
       "showPlayer",
     ]),
   }),
