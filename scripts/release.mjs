@@ -36,9 +36,13 @@ for (const name of ["latest.yml", blockmap]) {
   sums.push(createHash("sha256").update(await readFile("release/" + name)).digest("hex") + "  " + name);
 }
 await writeFile("release/SHA256SUMS.txt", sums.join("\n") + "\n");
+const changes = await readFile(`docs/releases/${version}.md`, "utf8").catch((error) => {
+  if (error.code === "ENOENT") return "";
+  throw error;
+});
 await writeFile(
   "release/RELEASE-NOTES.md",
-  `# Encore ${version}\n\nBuilt from tested commit ${process.env.GITHUB_SHA || "local working tree"}. Includes Windows x64 installer and portable packages with SHA-256 checksums.\n\nAuthenticode: ${process.env.CSC_LINK ? "credentials supplied; executable signature checked by workflow" : "unsigned; Windows SmartScreen warnings are expected"}.\nWidevine VMP: ${process.env.ENCORE_VMP_SIGN === "1" ? "signing hook completed" : "not signed; Spotify DRM is a distribution blocker"}.\n\nAutomated tests establish startup and queue/provider contracts, not real-account audio, installer UX or broadcast rights. Complete docs/RELEASE.md account and Windows checks before distributing this release. YouTube requires a visible video player. Desktop UI is English only.\n\nInstalled copies automatically download newer stable GitHub releases and offer Restart and install. Portable copies update manually through About → Open releases; retain the Encore-data folder. Source/licence: https://github.com/Timmsy1998/Encore/tree/v${version} (GPL-3.0-only), based on Better Song Request by HackMe_: https://github.com/xHackMe/better-song-request-streamerbot .\n`,
+  `# Encore ${version}\n\n${changes.trim() ? changes.trim() + "\n\n" : ""}Built from tested commit ${process.env.GITHUB_SHA || "local working tree"}. Includes Windows x64 installer and portable packages with SHA-256 checksums.\n\nAuthenticode: ${process.env.CSC_LINK ? "credentials supplied; executable signature checked by workflow" : "unsigned; Windows SmartScreen warnings are expected"}.\nWidevine VMP: ${process.env.ENCORE_VMP_SIGN === "1" ? "signing hook completed" : "not signed; Spotify DRM is a distribution blocker"}.\n\nAutomated tests establish startup and queue/provider contracts, not real-account audio, installer UX or broadcast rights. Complete docs/RELEASE.md account and Windows checks before distributing this release. YouTube requires a visible video player. Desktop UI is English only.\n\nInstalled copies automatically download newer stable GitHub releases and offer Restart and install. Portable copies update manually through About → Open releases; retain the Encore-data folder. Source/licence: https://github.com/Timmsy1998/Encore/tree/v${version} (GPL-3.0-only), based on Better Song Request by HackMe_: https://github.com/xHackMe/better-song-request-streamerbot .\n`,
 );
 console.log(
   "Windows packages and update metadata verified; checksums and release notes written.",

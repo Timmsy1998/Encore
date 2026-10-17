@@ -32,6 +32,11 @@ it("verifies update assets and rejects installer metadata mismatches before publ
     const checksums = readFileSync(join(directory, "release", "SHA256SUMS.txt"), "utf8");
     expect(checksums).toContain("latest.yml");
     expect(checksums).toContain(installer + ".blockmap");
+    mkdirSync(join(directory, "docs", "releases"), { recursive: true });
+    writeFileSync(join(directory, "docs", "releases", "1.0.0.md"), "## Changes\n\nSetup fixes.");
+    expect(run().status).toBe(0);
+    expect(readFileSync(join(directory, "release", "RELEASE-NOTES.md"), "utf8"))
+      .toContain("## Changes\n\nSetup fixes.");
     metadata.files[0].size--;
     writeFileSync(manifest, JSON.stringify(metadata));
     expect(run().status).not.toBe(0);

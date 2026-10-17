@@ -1,6 +1,6 @@
 # Windows builds and release gates
 
-Node 22.12+, Windows x64 and `npm ci` are required. The source version is `1.0.0`. No version tag or release has been created by this implementation.
+Node 22.12+, Windows x64 and `npm ci` are required. The source version is `1.0.1`. See [release changes](releases/1.0.1.md).
 
 ```powershell
 npm ci

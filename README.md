@@ -12,7 +12,7 @@ Actual Electron application running on Linux/WSL, with an empty queue and no con
 
 ## Windows installation
 
-When a verified version is published, download it from [Encore Releases](https://github.com/Timmsy1998/Encore/releases). This source change does not publish a release.
+Download the Windows installer or portable package from [Encore Releases](https://github.com/Timmsy1998/Encore/releases).
 
 - `Encore-VERSION-windows-x64-installer.exe`: per-user NSIS installation; optional launch at login.
 - `Encore-VERSION-windows-x64-portable.exe`: run from a writable folder without administrator access. Settings live in `Encore-data` beside the executable. Keep that folder when moving the app. Read-only locations produce an error rather than silently losing settings.
