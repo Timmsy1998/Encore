@@ -96,14 +96,19 @@ function snapshot(): Snapshot {
     updateReady: updates?.ready ?? false,
   };
 }
+let trackGeneration = 0;
+let playbackSample = { generation: -1, position: 0, observedAt: 0, active: false };
 function publicState() {
   return {
     current: queue.current,
     playing: queue.playing,
     generation,
+    trackGeneration,
     volume: queue.state.settings.volume,
     accent: queue.state.settings.overlayAccent,
     compact: queue.state.settings.overlayCompact,
+    appearance: Object.fromEntries(Object.entries(queue.state.settings).filter(([name]) => name.startsWith("overlay"))),
+    progress: playbackSample.generation === generation ? playbackSample : null,
   };
 }
 function emit() {
@@ -258,6 +263,7 @@ async function start(resume = false) {
         : { uris: ["spotify:track:" + queue.current.id] },
     );
   }
+  if (!resume || startedKey !== key(queue.current)) trackGeneration++;
   startedKey = key(queue.current);
   generation++;
   queue.playing = true;
@@ -660,7 +666,7 @@ const server = createServer(async (req, res) => {
       }
       const data = z
         .object({
-          event: z.enum(["ended", "error", "ready", "not_ready"]),
+          event: z.enum(["ended", "error", "ready", "not_ready", "progress"]),
           key: z.string().max(100).default(""),
           generation: z.number().int().default(-1),
           device: z
@@ -668,9 +674,15 @@ const server = createServer(async (req, res) => {
             .regex(/^[a-zA-Z0-9_-]{1,128}$/)
             .optional(),
           message: z.string().max(200).optional(),
+          position: z.number().min(0).max(86400).optional(),
+          active: z.boolean().optional(),
         })
         .parse(JSON.parse(body));
-      if (data.event === "ready" && data.device) {
+      if (data.event === "progress") {
+        if (queue.current && data.key === key(queue.current) && data.generation === generation && data.position !== undefined) {
+          playbackSample = { generation, position: data.position, observedAt: Date.now(), active: queue.playing && !!data.active };
+        }
+      } else if (data.event === "ready" && data.device) {
         spotifyDevice = data.device;
         spotifyStatus = "Browser player ready";
         emit();
@@ -746,7 +758,7 @@ const server = createServer(async (req, res) => {
     const path =
       url.pathname === "/" ? "/index.html" : decodeURIComponent(url.pathname);
     if (
-      !/^\/(?:index\.html|overlay\.(?:html|css|js)|player\.(?:html|css|js)|assets\/[a-zA-Z0-9_.-]+)$/.test(
+      !/^\/(?:index\.html|overlay(?:-renderer)?\.(?:html|css|js)|player\.(?:html|css|js)|assets\/[a-zA-Z0-9_.-]+)$/.test(
         path,
       )
     ) {

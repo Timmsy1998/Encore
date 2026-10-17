@@ -15,10 +15,12 @@ async function player() {
   const yt = {
     pauseVideo: vi.fn(),
     cueVideoById: vi.fn(),
+    loadVideoById: vi.fn(),
     playVideo: vi.fn(),
     setVolume: vi.fn(),
     getVideoData: () => ({ video_id: model.current.id }),
   };
+  let youtubeEvents: any;
   const listeners: Record<string, (...args: any[]) => void> = {};
   const sdk = {
     pause: vi.fn(async () => {}),
@@ -53,6 +55,7 @@ async function player() {
     },
     YT: {
       Player: function (_: string, options: any) {
+        youtubeEvents = options.events;
         queueMicrotask(() => options.events.onReady());
         return yt;
       },
@@ -74,6 +77,7 @@ async function player() {
   await flush();
   return {
     yt,
+    youtubeEvents,
     sdk,
     listeners,
     events,
@@ -87,7 +91,8 @@ async function player() {
 }
 it("switches providers using one playback intent and pauses the other source", async () => {
   const p = await player();
-  expect(p.yt.playVideo).toHaveBeenCalledTimes(1);
+  expect(p.yt.loadVideoById).toHaveBeenCalledExactlyOnceWith("youtube001");
+  expect(p.yt.cueVideoById).not.toHaveBeenCalled();
   await p.change({
     current: { source: "spotify", id: "spotify001" },
     playing: true,
@@ -105,8 +110,8 @@ it("switches providers using one playback intent and pauses the other source", a
     spotifyConnected: true,
   });
   expect(p.sdk.pause).toHaveBeenCalledTimes(1);
-  expect(p.yt.cueVideoById).toHaveBeenLastCalledWith("youtube002");
-  expect(p.yt.playVideo).toHaveBeenCalledTimes(2);
+  expect(p.yt.loadVideoById).toHaveBeenLastCalledWith("youtube002");
+  expect(p.yt.loadVideoById).toHaveBeenCalledTimes(2);
 });
 it("deduplicates Spotify endings and discards a completion after a provider switch", async () => {
   const p = await player();
@@ -147,4 +152,21 @@ it("deduplicates Spotify endings and discards a completion after a provider swit
   resolvePause();
   await p.flush();
   expect(p.events.filter((e) => e.event === "ended")).toHaveLength(1);
+});
+
+it("resumes without reloading, restarts repeated tracks, and surfaces autoplay blocking", async () => {
+  const p = await player();
+  const state = { current: { source: "youtube", id: "youtube001" }, volume: 70, spotifyConnected: true, trackGeneration: 1, generation: 2, playing: false };
+  await p.change(state);
+  const loads = p.yt.loadVideoById.mock.calls.length;
+  await p.change({ ...state, generation: 3, playing: true });
+  expect(p.yt.playVideo).toHaveBeenCalledTimes(1);
+  expect(p.yt.loadVideoById).toHaveBeenCalledTimes(loads);
+  await p.change({ ...state, generation: 3, playing: true, volume: 25 });
+  expect(p.yt.playVideo).toHaveBeenCalledTimes(1);
+  await p.change({ ...state, generation: 4, trackGeneration: 2, playing: true });
+  expect(p.yt.loadVideoById).toHaveBeenCalledTimes(loads + 1);
+  p.youtubeEvents.onAutoplayBlocked();
+  await p.flush();
+  expect(p.events).toContainEqual(expect.objectContaining({ event: "error", generation: 4, message: expect.stringContaining("autoplay was blocked") }));
 });

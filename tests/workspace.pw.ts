@@ -158,3 +158,38 @@ test("playlist imports show progress, completion and failure without losing save
   await expect(page.getByText("your saved playlist is unchanged", { exact: false })).toBeVisible();
   await expect(page.getByText("Imported fixture", { exact: true })).toBeVisible();
 });
+
+test("overlay customisation persists and matches the OBS renderer", async ({ page }) => {
+  await boot(page);
+  await page.getByRole("button", { name: "Overlay", exact: true }).click();
+  await page.getByLabel("Overlay style", { exact: true }).selectOption("glass");
+  await page.getByLabel("Accent colour", { exact: true }).fill("#70e0cc");
+  await page.getByRole("switch", { name: "Show artwork", exact: true }).click();
+  await page.getByRole("switch", { name: "Compact layout", exact: true }).click();
+  const preview = page.getByLabel("Overlay preview", { exact: true });
+  await expect(preview).toHaveClass(/glass compact/);
+  await expect(preview.locator(".encore-art")).toBeHidden();
+  await expect(preview.locator(".encore-times")).toContainText("1:18");
+  await page.reload();
+  await page.getByRole("button", { name: "Overlay", exact: true }).click();
+  await expect(page.getByLabel("Overlay style", { exact: true })).toHaveValue("glass");
+  await expect(preview).toHaveCSS("--accent", "#70e0cc");
+});
+
+test("OBS overlay shows provider progress, safe metadata, and live appearance", async ({ page }) => {
+  const model = { current: { id: "youtube001", source: "youtube", title: "<script>viewer text</script>", author: "Example artist", user: "Viewer", duration: 180 }, playing: true, appearance: { overlayTheme: "minimal", overlayAccent: "#70e0cc", overlayRequester: false }, progress: { position: 42, observedAt: Date.now(), active: false } };
+  await page.route("**/now", route => route.fulfill({ json: model }));
+  await page.route("**/events", route => route.fulfill({ contentType: "text/event-stream", body: "data: connected\n\n" }));
+  await page.route("https://i.ytimg.com/**", route => route.abort());
+  await page.goto("/overlay.html");
+  await expect(page.locator("main")).toBeVisible();
+  await expect(page.locator("h1")).toHaveText(model.current.title);
+  await expect(page.locator("main script")).toHaveCount(0);
+  await expect(page.locator(".encore-times")).toHaveText("0:423:00");
+  await expect(page.locator(".encore-requester")).toBeHidden();
+  model.appearance = { ...model.appearance, overlayTheme: "glass" };
+  await expect(page.locator("main")).toHaveClass(/glass/);
+  model.playing = false;
+  Object.assign(model.appearance, { overlayHidePaused: true });
+  await expect(page.locator("main")).toBeHidden();
+});

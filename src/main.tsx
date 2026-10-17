@@ -2,6 +2,7 @@ import {
   StrictMode,
   useEffect,
   useState,
+  useRef,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -40,6 +41,15 @@ import {
   type Settings,
 } from "./core/contracts";
 import "./styles.css";
+import "../public/overlay.css";
+import { renderOverlay } from "../public/overlay-renderer.js";
+function OverlayPreview({ state }: { state: Snapshot }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (ref.current) renderOverlay(ref.current, { current: state.current, playing: state.playing, appearance: state.settings }, true);
+  }, [state]);
+  return <div className="overlay-stage"><div ref={ref} aria-label="Overlay preview" /></div>;
+}
 const pages = [
   "Queue",
   "Listening",
@@ -393,8 +403,8 @@ function App() {
   const overlayForm = (
     <>
       <p>
-        A silent now-playing overlay for OBS. Add a Browser source at 600 × 150
-        and paste this URL. It reconnects while Encore is open.
+        A silent now-playing overlay for OBS. Add a Browser source at 960 × 260
+        and paste this URL. Changes appear live in OBS while Encore is open. Resize the source in OBS to fit your scene.
       </p>
       <Field label="Browser-source URL">
         <div className="copy-field">
@@ -409,37 +419,18 @@ function App() {
           </Button>
         </div>
       </Field>
-      <div className="actions">
-        <Field label="Accent colour">
-          <input
-            type="color"
-            value={s.settings.overlayAccent}
-            onChange={(e) => config({ overlayAccent: e.target.value })}
-          />
-        </Field>
-        <Toggle
-          label="Compact layout"
-          checked={s.settings.overlayCompact}
-          onChange={(v) => config({ overlayCompact: v })}
-        />
-        <Button
-          variant="secondary"
-          onClick={() => send({ type: "overlayTest" })}
-        >
-          Open test overlay
-        </Button>
+      <OverlayPreview state={s} />
+      <div className="overlay-controls">
+        <Field label="Overlay style"><select aria-label="Overlay style" value={s.settings.overlayTheme} onChange={e => config({ overlayTheme: e.target.value as Settings["overlayTheme"] })}>
+          <option value="card">Album card</option><option value="glass">Accent glass</option><option value="minimal">Minimal</option>
+        </select></Field>
+        {([ ["overlayAccent", "Accent colour"], ["overlayBackground", "Background colour"], ["overlayText", "Text colour"] ] as const).map(([name, label]) => <Field key={name} label={label}><input aria-label={label} type="color" value={s.settings[name]} onChange={e => config({ [name]: e.target.value })} /></Field>)}
+        {([ ["overlayOpacity", "Background opacity", 0, 100, "%"], ["overlayRadius", "Corner radius", 0, 48, "px"], ["overlayWidth", "Card width", 300, 900, "px"] ] as const).map(([name, label, min, max, unit]) => <Field key={name} label={`${label} · ${s.settings[name]}${unit}`}><input aria-label={label} type="range" min={min} max={max} value={s.settings[name]} onChange={e => config({ [name]: Number(e.target.value) })} /></Field>)}
       </div>
-      <div
-        className="overlay-preview"
-        style={{ borderColor: s.settings.overlayAccent }}
-      >
-        <AudioLines />
-        <div>
-          <small>OVERLAY PREVIEW</small>
-          <strong>{s.current?.title || "Your track title"}</strong>
-          <span>{s.current?.author || "Artist · requested by a viewer"}</span>
-        </div>
+      <div className="overlay-toggles">
+        {([ ["overlayCompact", "Compact layout"], ["overlayArtwork", "Show artwork"], ["overlayProgress", "Show progress"], ["overlayRequester", "Show requester"], ["overlayHidePaused", "Hide when paused"] ] as const).map(([name, label]) => <Toggle key={name} label={label} checked={s.settings[name]} onChange={v => config({ [name]: v })} />)}
       </div>
+      <Button variant="secondary" onClick={() => send({ type: "overlayTest" })}>Open test overlay</Button>
       <p className="notice">
         Music plays in Encore. Capture Encore application audio once in OBS;
         keep this browser source muted. Provider content needs appropriate

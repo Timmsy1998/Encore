@@ -174,6 +174,24 @@ try {
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
       .toBe("http://127.0.0.1:17843/callback");
     await window.getByRole("button", { name: "Overlay", exact: true }).click();
+    await window.getByLabel("Overlay style", { exact: true }).selectOption("glass");
+    await window.getByLabel("Accent colour", { exact: true }).fill("#70e0cc");
+    await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).settings.overlayTheme).toBe("glass");
+    const overlayId = await app.evaluate(async ({ BrowserWindow }) => {
+      const view = new BrowserWindow({ width: 960, height: 260, show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+      await view.loadURL("http://127.0.0.1:17843/overlay.html?test=1");
+      return view.id;
+    });
+    const overlay = app.windows().find(page => page.url().includes("/overlay.html?test=1"));
+    if (!overlay) throw Error("OBS overlay window did not load.");
+    try {
+      await expect(overlay.locator("main")).toHaveClass(/glass/);
+      await expect(overlay.locator("main")).toHaveCSS("--accent", "#70e0cc");
+      await expect(overlay.locator("h1")).toHaveText("Your next favourite song");
+      await window.getByLabel("Overlay style", { exact: true }).selectOption("minimal");
+      await expect(overlay.locator("main")).toHaveClass(/minimal/);
+      await overlay.screenshot({ path: "test-results/electron-overlay.png" });
+    } finally { await app.evaluate(({ BrowserWindow }, id) => BrowserWindow.fromId(id)?.destroy(), overlayId); }
     await window.getByRole("button", { name: "Copy overlay URL" }).click();
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
       .toBe("http://127.0.0.1:17843/overlay.html");
@@ -190,7 +208,7 @@ try {
   );
   if (!denied) throw Error("Node unexpectedly exposed in renderer");
   console.log(
-    "Electron startup, preload, empty paused state, Streamer.bot/YouTube/Spotify setup saves, authorization launch, Spotify/YouTube playlist imports, failure preservation, navigation and native clipboard passed.",
+    "Electron startup, preload, empty paused state, Streamer.bot/YouTube/Spotify setup saves, authorization launch, Spotify/YouTube playlist imports, failure preservation, navigation, live OBS overlay customisation and native clipboard passed.",
   );
 } finally {
   await app.close();

@@ -51,3 +51,11 @@ No release tag, push or publication was performed. Local commits exclude brief.m
 - Node 24.11.0 on Linux/WSL: TypeScript, ESLint, all 44 unit/contract tests and production build passed. Twelve Chromium UI checks passed across the three display sizes, including pending/completed/failed imports and retaining saved tracks.
 - Real Castlabs Electron smoke imported Spotify and YouTube playlists from the setup UI through validated IPC and provider parsing. It exercised a one-use Spotify OAuth callback with controlled token/API responses, verified setup progress stayed at step 5, and confirmed a failed YouTube import retained the previous saved playlist. Existing clipboard/setup/isolation checks also passed.
 - These controlled responses do not verify real accounts or the user's exact playlists. Windows/account checks remain unrun for this fix. No new release has been published for these changes.
+
+
+## Custom overlay and YouTube autoplay checks (v1.0.2)
+
+- Node 24.11.0 on Linux/WSL: TypeScript, ESLint, all 45 unit/contract tests and production build passed. Eighteen Chromium checks passed across three display sizes, including persisted overlay settings, shared preview, safe metadata rendering, provider progress and live paused visibility.
+- Player fixtures verify direct YouTube load-and-play, provider switching, resume without reload, repeated-track restart and visible autoplay blocking. They do not establish live account audio.
+- Real Castlabs Electron smoke passed setup saves, controlled OAuth and both playlist imports, failure preservation, native clipboard and isolation. A second sandboxed Electron window loaded the actual loopback OBS page and verified live style/accent changes; its screenshot was visually inspected.
+- Windows packaging/startup checks run in the tag workflow. Manual account audio, installed update interaction and OBS capture remain unverified locally. This release includes the previously recorded playlist import fixes.

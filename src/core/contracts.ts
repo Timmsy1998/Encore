@@ -33,6 +33,16 @@ export const SettingsSchema = z.object({
     .regex(/^#[a-fA-F0-9]{6}$/)
     .default("#e5aa73"),
   overlayCompact: z.boolean().default(false),
+  overlayTheme: z.enum(["card", "glass", "minimal"]).default("card"),
+  overlayBackground: z.string().regex(/^#[a-fA-F0-9]{6}$/).default("#17191f"),
+  overlayText: z.string().regex(/^#[a-fA-F0-9]{6}$/).default("#ffffff"),
+  overlayOpacity: z.number().int().min(0).max(100).default(92),
+  overlayRadius: z.number().int().min(0).max(48).default(24),
+  overlayWidth: z.number().int().min(300).max(900).default(560),
+  overlayArtwork: z.boolean().default(true),
+  overlayProgress: z.boolean().default(true),
+  overlayRequester: z.boolean().default(true),
+  overlayHidePaused: z.boolean().default(false),
   reply: z.string().max(500).default("@{user} · {message}"),
 });
 export type Settings = z.infer<typeof SettingsSchema>;

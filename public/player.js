@@ -43,6 +43,7 @@ function ended(expected = state) {
   void report("ended");
 }
 window.encorePause = async () => {
+  intent = -1;
   if (ytReady) yt.pauseVideo();
   if (spotify && spotifyActive) await spotify.pause();
   spotifyActive = false;
@@ -61,12 +62,17 @@ window.onYouTubeIframeAPIReady = () => {
         if (state?.current?.source !== "youtube" || !state.playing) return;
         if (
           event.data === 0 &&
-          ytKey === "youtube:" + state.current.id &&
+          ytKey === "youtube:" + state.current.id + ":" + state.trackGeneration &&
           yt.getVideoData().video_id === state.current.id
         )
           ended();
         if (event.data === 1)
           status.textContent = "YouTube · playing in Encore";
+      },
+      onAutoplayBlocked: () => {
+        if (state?.current?.source !== "youtube" || !state.playing) return;
+        status.textContent = "YouTube autoplay was blocked. Press Play to retry.";
+        report("error", { message: status.textContent });
       },
       onError: (event) => {
         status.textContent = "YouTube error " + event.data;
@@ -121,6 +127,7 @@ function observeSpotify(sample) {
   if (track?.id === state.current.id) {
     spotifyPrevious = sample;
     observationTime = Date.now();
+    void report("progress", { position: sample.position / 1000, active: !sample.paused });
     if (!sample.paused) status.textContent = "Spotify · playing in Encore";
   }
 }
@@ -208,18 +215,26 @@ async function update() {
       }
       spotifyPrevious = null;
       if (!ytReady) return;
-      const id = "youtube:" + track.id;
+      const id = "youtube:" + track.id + ":" + state.trackGeneration;
+      yt.setVolume(state.volume);
       if (ytKey !== id) {
         ytKey = id;
-        yt.cueVideoById(track.id);
-        intent = -1;
-      }
-      yt.setVolume(state.volume);
-      if (state.playing && intent !== state.generation) {
+        intent = state.playing ? state.generation : -1;
+        if (state.playing) {
+          // Loading starts playback atomically; cue + immediate play races the iframe.
+          yt.loadVideoById(track.id);
+        } else yt.cueVideoById(track.id);
+      } else if (state.playing && intent !== state.generation) {
         intent = state.generation;
         yt.playVideo();
-      } else if (!state.playing) yt.pauseVideo();
+      }
+      if (!state.playing) {
+        intent = -1;
+        yt.pauseVideo();
+      }
     } else {
+      intent = -1;
+      ytKey = "";
       if (ytReady) yt.pauseVideo();
       if (spotify) {
         await spotify.setVolume(state.volume / 100);
@@ -250,7 +265,12 @@ const sampler = setInterval(() => {
       .getCurrentState()
       .then(observeSpotify)
       .catch(() => report("not_ready"));
-}, 2000);
+  if (ytReady && state?.current?.source === "youtube" && yt.getVideoData().video_id === state.current.id) {
+    const position = yt.getCurrentTime();
+    if (Number.isFinite(position))
+      void report("progress", { position, active: yt.getPlayerState() === 1 });
+  }
+}, 1000);
 window.addEventListener("beforeunload", () => {
   clearInterval(sampler);
   stream.close();
