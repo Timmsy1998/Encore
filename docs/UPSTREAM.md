@@ -1,21 +1,28 @@
-# Upstream inventory and implementation plan
+# Upstream inventory and parity
 
-Encore modifies Better Song Request by HackMe_ (2026-10-17). Original source remains at repository root, unchanged; GPL v3 LICENSE is preserved. Upstream: https://github.com/xHackMe/better-song-request-streamerbot . Existing working-tree edits were present before implementation; do not stage them accidentally.
+Based on [Better Song Request by HackMe_](https://github.com/xHackMe/better-song-request-streamerbot), inspected 2026-10-17. Reviewed `app.js`, `index.html`, `style.css`, `translations.js`, README, widget and GPL v3 licence. Original browser code remains as reference; the Electron renderer does not load it. Initial unrelated working-tree changes were preserved.
 
-Inspected app.js (browser state, queue, provider requests, PKCE, Web Playback SDK, WebSocket authentication and General.Custom event dispatch), index.html (setup and import 1.1.0), translations.js (English, Polish, Ukrainian, German, French, Turkish), style.css, README and GPL v3 licence.
+Upstream uses browser-owned state, YouTube IFrame API, Spotify PKCE/Web Playback SDK, Streamer.bot WebSocket authentication and `General.Custom` event dispatch. The original 1.1.0 import is retained in `public/streamerbot-import.txt`; it remains upstream's encoded action data, not a fabricated replacement. Desktop logic extracts the contracts into main-owned TypeScript modules. See [current playback decision](PLAYBACK.md); the initial remote-player fallback was superseded by the user's instruction to use browser playback.
 
-Milestones: inventory/security decisions; desktop foundation; main-owned queue/providers/Streamer.bot; React workspace/setup/OBS; tests, release automation and documentation. Keep original browser application available as reference; it is not granted an Electron preload.
+| Upstream capability                 | Encore status                                                                                                 |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| YouTube requests/title search/links | Implemented through official metadata/API and visible player; account/network verification required           |
+| Spotify requests/links/playlist     | Official PKCE, SDK-owned device and Web API commands; Windows DRM/account test pending                        |
+| Shared queue/base playlist          | Main-owned request → personal → rotating base priority; current song finishes                                 |
+| Drag order                          | Drag plus keyboard move buttons                                                                               |
+| Skip/vote/wrong song                | Main queue handlers, unique voter accounting and last pending request removal                                 |
+| User/global limits, forced requests | Preserved; force bypasses request-off/limits, not bans or duration                                            |
+| Bans/favourites/history             | Persisted, with history capped at 1,000                                                                       |
+| Bot replies                         | Configurable `{user}`/`{message}` template, throttled, Twitch/YouTube/Kick target handling                    |
+| Channel points/permissions          | Supplied upstream actions; configure bindings/permissions in Streamer.bot                                     |
+| Reconnect/duplicate events          | Authenticated single subscription, exponential backoff, bounded deduplication                                 |
+| Unavailable tracks/timeouts         | Errors visible; no fake fallback, current playback pauses for explicit recovery/skip                          |
+| Import diagnostics                  | Version/capability comparison with 1.1.0, timeout and missing-feature reporting                               |
+| Setup tutorial                      | Eight persisted, skippable desktop steps                                                                      |
+| Backup/restore                      | Validated version-1 JSON; no credentials, atomic writes/recovery copies                                       |
+| Overlay                             | Silent, separate OBS browser process, SSE reconnect, accent/compact/test; legacy theme parity incomplete      |
+| Languages                           | Upstream English/Polish/Ukrainian/German/French/Turkish source retained; desktop UI English only (parity gap) |
 
-## Playback decision and evidence
+Supported event names: `SONG_REQUEST`, `SPOTIFY_SONG_REQUEST`, `SONG_REQUEST_FORCE`, `GET_SONG`, `WHEN_SONG`, `QUEUE_SONGS`, `SKIP_SONG`, `VOTE_SKIP`, `WRONG_SONG`, `VOLUME`, `PLAY_SONG`, `PAUSE_SONG`, `STOP_SONG`, `IMPORT_DIAGNOSTICS`. Moderator authorization is in imported Streamer.bot actions. Diagnostic capability reports do not prove channel permissions or account playback.
 
-YouTube uses the official IFrame API in a dedicated sandboxed player window served from a stable HTTP loopback origin. Do not strip Referer: https://developers.google.com/youtube/terms/required-minimum-functionality#embedded-player-api-client-identity . Embedding restrictions, error 153 and autoplay restrictions remain provider-controlled. Display the video player; no audio extraction.
-
-Stock Electron is not a supported Spotify Web Playback SDK target; no Widevine redistribution is attempted. Use public-client authorization code + PKCE in the system browser and Web API control of an already active official Spotify player. Premium and Spotify developer app access are required. Redirect is http://127.0.0.1:17843/callback (register exactly). Official references: https://developer.spotify.com/documentation/web-api/tutorials/code-pkce-flow , https://developer.spotify.com/documentation/web-api/concepts/redirect_uri , https://developer.spotify.com/documentation/web-api/reference/start-a-users-playback . Spotify audio comes from the official app, YouTube audio from Encore's player. OBS overlay is silent. Do not enable both OBS application capture and desktop capture for the same audio.
-
-Streamer.bot authentication hashes password+salt then secret+challenge; subscribe once per authenticated socket to General.Custom. Preserve import payloads SONG_REQUEST, SPOTIFY_SONG_REQUEST, SONG_REQUEST_FORCE, GET_SONG, WHEN_SONG, QUEUE_SONGS, SKIP_SONG, VOTE_SKIP, WRONG_SONG, VOLUME, PLAY_SONG, PAUSE_SONG, STOP_SONG and IMPORT_DIAGNOSTICS. Source: https://docs.streamer.bot/api/websocket/guide . Moderator permissions belong to imported Streamer.bot commands, not viewer text.
-
-Electron guidance: https://www.electronjs.org/docs/latest/tutorial/security . Build tooling references: https://vite.dev/guide/ , https://ui.shadcn.com/docs/installation/vite , https://www.electron.build/ . Versions pinned via npm registry; Node 22.12+ required for Electron tooling, use Node 22 LTS in CI.
-
-## Manual verification gate
-
-This Linux/WSL workspace cannot establish Windows installer behaviour, account permissions, YouTube embedding acceptance or Spotify active-device playback without real accounts and Windows execution. These are release prerequisites, never assumed passing. Verify development and packaged Windows playback before distributing a release. See RELEASE.md.
+Intentional changes: playback inside Encore rather than external music apps; main owns durable state; personal listening does not require Streamer.bot; restart is paused; overlay never plays audio; YouTube remains visible. GPL licence and upstream notices are retained.
