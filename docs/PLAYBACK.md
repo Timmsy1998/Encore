@@ -2,6 +2,12 @@
 
 The requested browser-playback direction is implemented using Spotify's official Web Playback SDK and YouTube's official IFrame API, inside one isolated Encore provider view. There is one main-owned queue and common transport. Encore does not control or require an external Spotify app. An iframe-free YouTube audio player is not supported by the official API; Encore retains the visible 320×200 video and controls. YouTube pauses when the app is hidden/minimised; playback restores the window.
 
+## Search preference
+
+Plain-title requests and personal listening searches try connected Spotify first. If Spotify is disconnected or returns no available track, Encore searches up to 15 YouTube results, preferring artist Topic/auto-generated releases, then official audio, then regular videos. It skips unavailable or untimed videos and retains search relevance order within each tier. Topic channels and “Provided to YouTube by” descriptions are best-effort artist-audio signals; this is not a separate YouTube Music catalogue integration. Search uses the official [Spotify search endpoint](https://developer.spotify.com/documentation/web-api/reference/search) and [YouTube search endpoint](https://developers.google.com/youtube/v3/docs/search/list), with batched video metadata.
+
+Explicit Spotify, YouTube and music.youtube.com track links keep their selected track. Playlist imports keep their original order. Authentication, quota and network errors are surfaced rather than silently switching services; reconnect or retry when shown.
+
 ## Spotify
 
 Create a Spotify developer app with Web Playback SDK access and register the redirect URI below. For Development Mode apps, open the app's **User Management** tab, select **Add new user**, and enter the name and Spotify email address of the account you will connect in Encore. Sign in with that same account when connecting. See Spotify's [Development Mode user access instructions](https://developer.spotify.com/documentation/web-api/concepts/quota-modes). Encore cannot add users to your developer app for you.

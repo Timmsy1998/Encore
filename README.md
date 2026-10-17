@@ -28,7 +28,7 @@ The eight-step setup can be skipped, resumed and reopened from Settings:
 1. Read the playback and request overview.
 2. For chat requests, run Streamer.bot with its local WebSocket server enabled. Match the port (default 8080), enter its password and connect. Streamer.bot must remain running for requests and replies; personal playback is independent.
 3. Copy Encore's supplied upstream 1.1.0 action import into Streamer.bot, configure channel commands and permissions there, and run import diagnostics. Encore serves its own UI and overlay; Streamer.bot HTTP hosting is unnecessary.
-4. Enable YouTube Data API v3 in a Google project, enter an API key and test it. Titles search YouTube; YouTube links resolve directly. Quotas, deleted videos and embedding restrictions are reported.
+4. Enable YouTube Data API v3 in a Google project, enter an API key and test it. Title searches prefer connected Spotify, then artist Topic/auto-generated or official audio on YouTube, then regular YouTube videos. Explicit track links resolve directly. Quotas, deleted videos and embedding restrictions are reported.
 5. Optionally create a Spotify developer app with Web Playback SDK/Web API access. Register **`http://127.0.0.1:17843/callback` exactly**. Enter the Client ID and connect in the system browser. No Client Secret is needed. Spotify Premium and developer-app account access are required. Authorization alone does not establish a ready playback device.
 6. Add a supported Spotify or YouTube playlist for fallback music, or add personal tracks in Listening.
 7. Optionally configure the silent OBS overlay.

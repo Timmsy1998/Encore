@@ -71,3 +71,10 @@ No release tag, push or publication was performed. Local commits exclude brief.m
 - Node 24.11.0 on Linux/WSL: TypeScript, ESLint, 47 unit/contract tests, production build and 24 Chromium checks passed. Older settings retain horizontal artwork; independent presets persist vertical layout and vinyl options. Browser checks cover request/listening/base attribution, omitted platform names, playback-aware vinyl/equalizer animation, song crossfades, progress updates without repeated transitions, and reduced motion.
 - Real Castlabs Electron smoke passed live horizontal and vertical/vinyl overlays in separate sandboxed windows, alongside setup, controlled playlist imports, clipboard and isolation checks. The gallery screenshot was inspected, including fallback vinyl artwork. The global Working indicator was removed; operation errors and specific import feedback remain available.
 - Windows OBS capture and real-account audio were not exercised for this change. No new release was published.
+
+
+## Request search preference
+
+- Node 24.11.0 on Linux/WSL: TypeScript, ESLint, all 58 unit/contract tests and production build passed. New controlled provider cases cover Spotify preference, unavailable-track fallback, artist Topic/auto-generated and official-audio ranking, video fallback, metadata ordering, encoded queries, explicit links and visible provider failures.
+- All 24 Chromium UI checks passed across three display sizes. The real Castlabs Electron smoke passed existing setup, controlled playlist imports, clipboard, navigation and live overlays. Search priority itself is covered by controlled provider unit tests.
+- YouTube Music preference uses metadata heuristics within YouTube search results, not a separately authenticated Music catalogue. Real-account search quality, audio and Windows checks remain unverified for this change.

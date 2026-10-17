@@ -6,7 +6,7 @@ Upstream uses browser-owned state, YouTube IFrame API, Spotify PKCE/Web Playback
 
 | Upstream capability                 | Encore status                                                                                                 |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| YouTube requests/title search/links | Implemented through official metadata/API and visible player; account/network verification required           |
+| YouTube requests/title search/links | Implemented: title search prefers Spotify, then artist audio on YouTube, then videos; explicit links retained; real-account verification required           |
 | Spotify requests/links/playlist     | Official PKCE, SDK-owned device and Web API commands; Windows DRM/account test pending                        |
 | Shared queue/base playlist          | Main-owned request → personal → rotating base priority; current song finishes; batched YouTube/current Spotify imports with progress and failure preservation |
 | Drag order                          | Drag plus keyboard move buttons                                                                               |

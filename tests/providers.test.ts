@@ -189,3 +189,180 @@ describe("playlist imports", () => {
   });
 
 });
+
+describe("request search preference", () => {
+  const spotifySong = {
+    id: "b".repeat(22),
+    type: "track",
+    name: "Song",
+    artists: [{ name: "Artist" }],
+    duration_ms: 180000,
+  };
+  const video = (
+    id: string,
+    title: string,
+    channelTitle = "Artist",
+    description = "",
+    embeddable = true,
+  ) => ({
+    id,
+    snippet: { title, channelTitle, description },
+    status: { embeddable },
+    contentDetails: { duration: "PT3M" },
+  });
+  function setup(connected = true) {
+    const p = new Providers(() => {});
+    p.youtubeKey = "key";
+    if (connected) {
+      p.access = "access";
+      p.expires = Date.now() + 3600000;
+    }
+    return p;
+  }
+  function youtubeResults(items: ReturnType<typeof video>[]) {
+    return [
+      reply({ items: items.map(({ id }) => ({ id: { videoId: id } })) }),
+      // Metadata order is not guaranteed to match search order.
+      reply({ items: [...items].reverse() }),
+    ];
+  }
+  it("prefers Spotify and safely encodes the entire title query", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        reply({
+          tracks: {
+            items: [{ ...spotifySong, is_playable: false }, spotifySong],
+          },
+        }),
+      );
+    vi.stubGlobal("fetch", fetch);
+    expect(await setup().resolve("Artist & Song #1", "Viewer")).toMatchObject({
+      source: "spotify",
+      user: "Viewer",
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const url = new URL(fetch.mock.calls[0][0]);
+    expect(url.pathname).toBe("/v1/search");
+    expect(url.searchParams.get("q")).toBe("Artist & Song #1");
+    expect(url.searchParams.get("type")).toBe("track");
+  });
+  it("falls back from unavailable Spotify results to artist Topic audio before videos", async () => {
+    const items = [
+      video("video000001", "Song (Official Music Video)"),
+      video("audio000001", "Song (Official Audio)"),
+      video("topic000001", "Song", "Artist - Topic"),
+    ];
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        reply({ tracks: { items: [{ ...spotifySong, is_playable: false }] } }),
+      );
+    for (const response of youtubeResults(items))
+      fetch.mockResolvedValueOnce(response);
+    vi.stubGlobal("fetch", fetch);
+    expect(await setup().resolve("Artist Song")).toMatchObject({
+      source: "youtube",
+      id: "topic000001",
+    });
+    const search = new URL(fetch.mock.calls[1][0]);
+    expect(search.searchParams.get("videoEmbeddable")).toBe("true");
+    expect(search.searchParams.get("videoSyndicated")).toBe("true");
+  });
+  it.each([
+    [
+      "official audio",
+      [
+        video("video000001", "Song Official Video"),
+        video("audio000001", "Song Official Audio"),
+      ],
+      "audio000001",
+    ],
+    [
+      "auto-generated release",
+      [
+        video("video000001", "Song Music Video"),
+        video(
+          "audio000001",
+          "Song",
+          "Artist",
+          "Provided to YouTube by Label\nSong",
+        ),
+      ],
+      "audio000001",
+    ],
+    [
+      "video fallback",
+      [
+        video("topic000001", "Song", "Artist - Topic", "", false),
+        video("video000001", "Song Music Video"),
+      ],
+      "video000001",
+    ],
+    [
+      "original relevance order",
+      [video("video000001", "Song"), video("video000002", "Song live")],
+      "video000001",
+    ],
+  ] as const)(
+    "uses %s without Spotify connected",
+    async (_label, items, expected) => {
+      const fetch = vi.fn();
+      for (const response of youtubeResults([...items]))
+        fetch.mockResolvedValueOnce(response);
+      vi.stubGlobal("fetch", fetch);
+      expect((await setup(false).resolve("Artist Song")).id).toBe(expected);
+      expect(fetch).toHaveBeenCalledTimes(2);
+    },
+  );
+  it.each([
+    "https://youtu.be/video000001",
+    "https://music.youtube.com/watch?v=video000001",
+  ])("preserves explicit YouTube selection: %s", async (url) => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        reply({ items: [video("video000001", "Song Music Video")] }),
+      );
+    vi.stubGlobal("fetch", fetch);
+    expect((await setup().resolve(url)).id).toBe("video000001");
+    expect(new URL(fetch.mock.calls[0][0]).pathname).toContain("/videos");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it("preserves explicit Spotify selection", async () => {
+    const fetch = vi.fn().mockResolvedValue(reply(spotifySong));
+    vi.stubGlobal("fetch", fetch);
+    expect(
+      (
+        await setup().resolve(
+          "https://open.spotify.com/track/" + spotifySong.id,
+        )
+      ).source,
+    ).toBe("spotify");
+    expect(new URL(fetch.mock.calls[0][0]).pathname).toBe(
+      "/v1/tracks/" + spotifySong.id,
+    );
+  });
+  it("reports Spotify failures rather than silently changing service", async () => {
+    const fetch = vi.fn().mockResolvedValue(reply({}, 401));
+    vi.stubGlobal("fetch", fetch);
+    await expect(setup().resolve("Artist Song")).rejects.toThrow(
+      "Reconnect your account",
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it("reports empty and unplayable YouTube searches", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(reply({ items: [] }));
+    vi.stubGlobal("fetch", fetch);
+    await expect(setup(false).resolve("No results")).rejects.toThrow(
+      "No supported track",
+    );
+    for (const response of youtubeResults([
+      video("video000001", "Unavailable", "Artist", "", false),
+    ]))
+      fetch.mockResolvedValueOnce(response);
+    await expect(setup(false).resolve("Unavailable")).rejects.toThrow(
+      "No playable track",
+    );
+  });
+});

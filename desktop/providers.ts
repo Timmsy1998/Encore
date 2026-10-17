@@ -169,13 +169,7 @@ export class Providers {
       else if (url.hostname === "youtu.be") id = url.pathname.slice(1);
       else throw Error("Only YouTube and Spotify links are supported.");
     } else {
-      const data = await this.youtube("search", {
-        part: "snippet",
-        type: "video",
-        maxResults: "1",
-        q: input,
-      });
-      id = data.items?.[0]?.id?.videoId ?? "";
+      return this.search(input, user);
     }
     if (!/^[\w-]{11}$/.test(id)) throw Error("No supported track found.");
     const data = await this.youtube("videos", {
@@ -183,9 +177,70 @@ export class Providers {
       id,
     });
     const track = this.youtubeTrack(data.items?.[0], id, user);
-    if (!track)
-      throw Error("This video is unavailable or cannot be embedded.");
+    if (!track) throw Error("This video is unavailable or cannot be embedded.");
     return track;
+  }
+  private async search(input: string, user: string): Promise<Track> {
+    if (this.access || this.refresh) {
+      const data = await this.spotify(
+        "/search?" +
+          new URLSearchParams({ q: input, type: "track", limit: "10" }),
+      );
+      const match = data.tracks?.items?.find(
+        (item: any) =>
+          item &&
+          item.type === "track" &&
+          !item.is_local &&
+          item.is_playable !== false &&
+          item.duration_ms > 0 &&
+          item.duration_ms <= 86400000,
+      );
+      if (match) return this.spotifyTrack(match, user);
+    }
+    const results = await this.youtube("search", {
+      part: "snippet",
+      type: "video",
+      maxResults: "15",
+      videoEmbeddable: "true",
+      videoSyndicated: "true",
+      q: input,
+    });
+    const ids: string[] = [
+      ...new Set<string>(
+        (results.items ?? [])
+          .map((item: any) => item.id?.videoId)
+          .filter(
+            (id: unknown) => typeof id === "string" && /^[\w-]{11}$/.test(id),
+          ),
+      ),
+    ];
+    if (!ids.length) throw Error("No supported track found.");
+    const metadata = await this.youtube("videos", {
+      part: "snippet,contentDetails,status",
+      id: ids.join(","),
+    });
+    // Data API has no YouTube Music catalogue flag. Topic/auto-generated
+    // releases and official audio are best-effort signals within relevant results.
+    const candidates = ids.flatMap((id) => {
+      const item = metadata.items?.find((video: any) => video.id === id);
+      const track = this.youtubeTrack(item, id, user);
+      if (!track) return [];
+      const title = item.snippet.title as string;
+      const musicVideo =
+        /\b(?:official\s+)?music\s+video\b|\bofficial\s+video\b/i.test(title);
+      const topic = / - Topic$/i.test(item.snippet.channelTitle);
+      const provided = /^Provided to YouTube by /im.test(
+        item.snippet.description ?? "",
+      );
+      const audio = /\bofficial\s+audio\b|\baudio\s+only\b/i.test(title);
+      const rank = musicVideo ? 0 : topic || provided ? 2 : audio ? 1 : 0;
+      return [{ track, rank }];
+    });
+    // Stable sort retains provider relevance within each preference tier.
+    candidates.sort((a, b) => b.rank - a.rank);
+    if (!candidates.length)
+      throw Error("No playable track found in the search results.");
+    return candidates[0].track;
   }
   private youtubeTrack(item: any, id: string, user: string): Track | null {
     if (!item?.status?.embeddable) return null;
