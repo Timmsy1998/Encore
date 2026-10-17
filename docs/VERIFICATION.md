@@ -84,3 +84,9 @@ No release tag, push or publication was performed. Local commits exclude brief.m
 - Node 24.11.0 on Linux/WSL: TypeScript, ESLint, all 58 unit/contract tests and production build passed. Migration coverage includes the default-off Canvas setting and independent saved designs.
 - All 27 Chromium checks passed across three display sizes, covering the persisted toggle, static settings preview, minimum square player size, muted initialization, playback/seek synchronisation without reload, track changes without cloned video frames, error fallback and disposal when hidden or switching to Spotify. Provider playback uses a controlled IFrame API fixture rather than a live YouTube account.
 - Real Castlabs Electron smoke passed setup saves, controlled playlist imports, native clipboard, navigation and live independent loopback overlays. Live YouTube Canvas embedding/autoplay in OBS, Windows capture and real-account audio remain unverified. Spotify Canvas is unavailable through its public APIs and is not implemented; Spotify retains cover art. No release was published for this change.
+
+## v1.1.0 release checks
+
+- Linux/WSL with Node 24.11.0: TypeScript, ESLint, all 58 unit/contract tests, production build, all 27 Chromium checks across three display sizes, and real Castlabs Electron smoke passed for version 1.1.0.
+- Windows packaging, packaged startup and checksum validation run in the tagged GitHub release workflow before stable publication. Live accounts, OBS Canvas playback and manual Windows installation/capture remain unverified.
+- The standalone songrequest.cs action and unrelated local upstream edits are excluded from the release commit.
