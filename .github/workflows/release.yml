@@ -1,0 +1,90 @@
+name: Windows release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Validate tag against package
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          if ($env:RELEASE_TAG -cne "v$version" -or $version -notmatch '^\d+\.\d+\.\d+$') { throw 'Tag/package version mismatch' }
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+      - run: npm ci
+      - run: npm run check
+      - run: npx playwright install chromium
+      - run: npm run test:ui
+      - run: npm run runtime
+      - run: npm run test:desktop
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install castlabs-evs==1.3.2
+      - name: Build installer and portable packages
+        shell: pwsh
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          EVS_ACCOUNT_NAME: ${{ secrets.EVS_ACCOUNT_NAME }}
+          EVS_PASSWD: ${{ secrets.EVS_PASSWD }}
+        run: |
+          if ($env:EVS_ACCOUNT_NAME -and $env:EVS_PASSWD) { $env:ENCORE_VMP_SIGN = '1' }
+          npm run package:win
+          if ($LASTEXITCODE -ne 0) { throw 'Packaging failed' }
+          if ($env:CSC_LINK) {
+            $signature = Get-AuthenticodeSignature release/win-unpacked/Encore.exe
+            if ($signature.Status -ne 'Valid') { throw 'Authenticode validation failed' }
+          }
+          $env:ENCORE_SMOKE_EXE = (Resolve-Path release/win-unpacked/Encore.exe).Path
+          npm run test:desktop
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged startup check failed' }
+          node scripts/release.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Artifact verification failed' }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-release
+          path: |
+            release/*-installer.exe
+            release/*-portable.exe
+            release/SHA256SUMS.txt
+            release/RELEASE-NOTES.md
+          if-no-files-found: error
+          retention-days: 14
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-release
+          path: assets
+      - name: Verify and publish tested assets
+        working-directory: assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          sha256sum --check SHA256SUMS.txt
+          gh release create "$RELEASE_TAG" ./*-installer.exe ./*-portable.exe SHA256SUMS.txt --verify-tag --prerelease --title "Encore $RELEASE_TAG" --notes-file RELEASE-NOTES.md
