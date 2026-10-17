@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { CommandSchema, defaults, key, migrate, type Track } from "../src/core/contracts";
 import { Playlists } from "../src/core/playlists";
 import { Queue } from "../src/core/queue";
@@ -7,6 +7,48 @@ const otherId = "22222222-2222-4222-8222-222222222222";
 const spotify: Track = { id: "a".repeat(22), source: "spotify", title: "Spotify song", author: "Artist", duration: 180, user: "Viewer" };
 const youtube: Track = { ...spotify, id: "abcdefghijk", source: "youtube", title: "YouTube song" };
 describe("saved mixed playlists", () => {
+  afterEach(() => vi.restoreAllMocks());
+  it("shuffles the playback copy without repeats and keeps requests ahead of personal music and base tracks", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const q = new Queue(); const library = new Playlists(q.state);
+    const third = { ...youtube, id: "thirdsong01" };
+    library.create(id, "Mix"); library.append(id, [spotify, youtube, third]);
+    q.listen({ ...youtube, id: "current0001" }); q.next(); q.playing = true;
+    library.activate(id, true);
+    expect(q.current?.id).toBe("current0001");
+    expect(q.playing).toBe(true);
+    expect(q.state.base.map(key)).toEqual([key(youtube), key(third), key(spotify)]);
+    expect(library.get(id).tracks.map(key)).toEqual([key(spotify), key(youtube), key(third)]);
+    q.add({ ...youtube, id: "request0001" }); q.listen({ ...youtube, id: "personal001" });
+    expect(q.next()?.id).toBe("request0001");
+    expect(q.next()?.id).toBe("personal001");
+    expect([q.next(), q.next(), q.next()].map(t => key(t!))).toEqual([key(youtube), key(third), key(spotify)]);
+    q.ban(key(third));
+    expect(q.next()?.id).toBe(youtube.id);
+    expect(q.next()?.id).toBe(spotify.id);
+  });
+  it("preserves shuffled rotation across edits and restart, and can return to saved order", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const q = new Queue(); const library = new Playlists(q.state);
+    const third = { ...youtube, id: "thirdsong01" };
+    library.create(id, "Mix"); library.append(id, [spotify, youtube, third]); library.activate(id, true);
+    q.next();
+    library.move(id, 0, 1);
+    expect(q.state.base.map(key)).toEqual([key(third), key(spotify), key(youtube)]);
+    library.remove(id, key(spotify));
+    library.append(id, [{ ...spotify, id: "b".repeat(22) }]);
+    const restored = new Queue(migrate(JSON.parse(JSON.stringify(q.persisted()))));
+    expect(restored.state.baseShuffle).toBe(true);
+    expect(restored.state.base.map(key)).toEqual(q.state.base.map(key));
+    expect(restored.playing).toBe(false);
+    expect(restored.next()?.id).toBe(third.id);
+    library.activate(id);
+    expect(q.state.baseShuffle).toBe(false);
+    expect(q.state.base.map(key)).toEqual(library.get(id).tracks.map(key));
+    library.activate(id, true); library.stop();
+    expect(q.state.baseShuffle).toBe(false);
+    expect(q.state.base).toEqual([]);
+  });
   it("keeps mixed songs and imports, deduplicates provider IDs, and persists library ordering independently of rotation", () => {
     const q = new Queue();
     const library = new Playlists(q.state);
@@ -63,8 +105,10 @@ describe("saved mixed playlists", () => {
     expect(() => library.rename(id, " ")).toThrow();
     expect(() => library.create(id, "Duplicate")).toThrow();
     expect(state).toEqual(before);
-    const old: any = defaults(); delete old.playlists; delete old.activePlaylistId; old.base = [youtube];
-    expect(migrate(old)).toMatchObject({ playlists: [], activePlaylistId: null, base: [youtube] });
+    const old: any = defaults(); delete old.playlists; delete old.activePlaylistId; delete old.baseShuffle; old.base = [youtube];
+    expect(migrate(old)).toMatchObject({ playlists: [], activePlaylistId: null, baseShuffle: false, base: [youtube] });
+    expect(CommandSchema.parse({ type: "playlistActivate", id })).toMatchObject({ shuffle: false });
+    expect(CommandSchema.safeParse({ type: "playlistActivate", id, shuffle: "true" }).success).toBe(false);
     for (const command of [{ type: "playlistCreate", id: "bad", name: "Mix" }, { type: "playlistMove", id, from: -1, to: 0 }, { type: "playlistAdd", id, input: " " }]) expect(CommandSchema.safeParse(command).success).toBe(false);
     expect(() => migrate({ ...state, activePlaylistId: otherId })).toThrow();
   });

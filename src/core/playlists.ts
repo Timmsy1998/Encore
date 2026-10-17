@@ -1,5 +1,13 @@
 import { key, PlaylistSchema, type SavedState, type Track } from "./contracts";
 
+function shuffle(tracks: Track[]) {
+  for (let i = tracks.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
+  }
+  return tracks;
+}
+
 // Main owns this library. The rotating base is a playback copy, so rotation
 // never changes the saved order. Library edits preserve the next base track.
 export class Playlists {
@@ -23,15 +31,18 @@ export class Playlists {
     if (this.state.activePlaylistId === id) this.stop();
     this.state.playlists = this.state.playlists.filter(item => item.id !== id);
   }
-  activate(id: string) {
+  activate(id: string, shuffled = false) {
     const playlist = this.get(id);
     if (!playlist.tracks.length) throw Error("Add some tracks before using this playlist for the stream.");
     this.state.base = playlist.tracks.map(track => ({ ...track, user: "Auto" }));
+    if (shuffled) shuffle(this.state.base);
+    this.state.baseShuffle = shuffled;
     this.state.activePlaylistId = id;
   }
   stop() {
     this.state.activePlaylistId = null;
     this.state.base = [];
+    this.state.baseShuffle = false;
   }
   private update(id: string, tracks: Track[]) {
     const playlist = this.get(id);
@@ -39,6 +50,18 @@ export class Playlists {
     const next = this.state.base[0];
     playlist.tracks = checked;
     if (this.state.activePlaylistId === id) {
+      if (this.state.baseShuffle) {
+        const remaining = new Map(checked.map(track => [key(track), track]));
+        const ordered: Track[] = [];
+        for (const track of this.state.base) {
+          const updated = remaining.get(key(track));
+          if (updated) ordered.push(updated);
+          remaining.delete(key(track));
+        }
+        this.state.base = [...ordered, ...shuffle([...remaining.values()])]
+          .map(track => ({ ...track, user: "Auto" }));
+        return;
+      }
       const index = next ? checked.findIndex(track => key(track) === key(next)) : -1;
       const rotated = index > 0 ? [...checked.slice(index), ...checked.slice(0, index)] : checked;
       this.state.base = rotated.map(track => ({ ...track, user: "Auto" }));

@@ -34,6 +34,11 @@ async function boot(page: Page, setup = false, updateReady = false) {
       },
       command: async (c) => {
         if (c.type === "settings") Object.assign(state.settings, c.settings);
+        if (c.type === "playlistActivate") {
+          state.activePlaylistId = c.id;
+          state.baseShuffle = c.shuffle;
+          state.base = state.playlists.find((item: { id: string }) => item.id === c.id).tracks;
+        }
         if (c.type === "base") {
           if (c.input.includes("missing")) throw Error("Playlist unavailable: test fixture.");
           state.base = [{ id: "abcdefghijk", source: "youtube", title: "Imported fixture", author: "Fixture", duration: 180, user: "Auto" }];
@@ -364,10 +369,15 @@ test("saved mixed playlist controls fit desktop scaling and survive navigation",
   const library = page.getByRole("region", { name: "Saved playlists" });
   await expect(library.getByRole("status")).toHaveText("Stream playlist: Mixed stream");
   await expect(library.getByRole("listitem")).toHaveCount(2);
+  await library.getByRole("button", { name: "Shuffle for stream", exact: true }).click();
+  await expect(library.getByText("Shuffle is on.", { exact: false })).toBeVisible();
   await expect(library.getByRole("button", { name: "Move Spotify favourite up", exact: true })).toBeDisabled();
   await expect(library.getByRole("button", { name: "Move YouTube exclusive down", exact: true })).toBeDisabled();
   expect(await page.locator(".content").evaluate(e => e.scrollWidth <= e.clientWidth + 1)).toBe(true);
   await page.getByRole("button", { name: "Queue", exact: true }).click();
   await page.getByRole("button", { name: "Listening", exact: true }).click();
   await expect(library.getByRole("listitem")).toHaveCount(2);
+  await expect(library.getByText("Shuffle is on.", { exact: false })).toBeVisible();
+  await library.getByRole("button", { name: "Use for stream", exact: true }).click();
+  await expect(library.getByText("Shuffle is on.", { exact: false })).toHaveCount(0);
 });

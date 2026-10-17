@@ -17,6 +17,7 @@ export function PlaylistLibrary({ state, busy, send }: {
     <h2>Your playlists</h2>
     <p>Mix Spotify and YouTube songs in one playlist. Requests play first, then your listening queue, then the stream playlist. The current song always finishes.</p>
     <p role="status">Stream playlist: {active?.name ?? (state.base.length ? "Imported base playlist" : "None")}</p>
+    {active && state.baseShuffle && <p className="muted">Shuffle is on. The stream playlist rotates in a randomised order.</p>}
     <form className="playlist-controls" onSubmit={async event => {
       event.preventDefault();
       const id = crypto.randomUUID();
@@ -30,7 +31,8 @@ export function PlaylistLibrary({ state, busy, send }: {
         {state.playlists.map(item => <option key={item.id} value={item.id}>{item.name} ({item.tracks.length})</option>)}
       </select></label>
       <div className="playlist-controls">
-        <Button disabled={busy || !playlist.tracks.length} onClick={() => send({ type: "playlistActivate", id: playlist.id })}>Use for stream</Button>
+        <Button disabled={busy || !playlist.tracks.length} onClick={() => send({ type: "playlistActivate", id: playlist.id, shuffle: false })}>Use for stream</Button>
+        <Button variant="secondary" disabled={busy || !playlist.tracks.length} onClick={() => send({ type: "playlistActivate", id: playlist.id, shuffle: true })}>Shuffle for stream</Button>
         {(state.base.length > 0 || active) && <Button variant="secondary" disabled={busy} onClick={() => send({ type: "playlistStop" })}>Stop stream playlist</Button>}
         <Button variant="secondary" disabled={busy} onClick={() => setDeleting(!deleting)}>Delete playlist</Button>
       </div>

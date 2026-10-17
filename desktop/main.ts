@@ -403,7 +403,7 @@ async function command(c: Command) {
     case "playlistCreate": playlists.create(c.id, c.name); break;
     case "playlistRename": playlists.rename(c.id, c.name); break;
     case "playlistDelete": playlists.delete(c.id); break;
-    case "playlistActivate": playlists.activate(c.id); break;
+    case "playlistActivate": playlists.activate(c.id, c.shuffle); break;
     case "playlistStop": playlists.stop(); break;
     case "playlistAdd":
     case "playlistImport": {
@@ -459,6 +459,7 @@ async function command(c: Command) {
       const tracks = await providers.playlist(c.input);
       queue.state.base = [...new Map(tracks.map((t) => [key(t), t])).values()];
       queue.state.activePlaylistId = null;
+      queue.state.baseShuffle = false;
       break;
     }
     case "remove":

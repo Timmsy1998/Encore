@@ -49,6 +49,8 @@ Open **Listening → Your playlists** to create a playlist. Add individual songs
 
 Choose **Use for stream** to make a playlist your background music. Requests still go first, followed by anything in your personal listening queue. Changing the stream playlist won't cut off the current song.
 
+Choose **Shuffle for stream** to randomise its playback order without changing the saved playlist. Every song plays once per rotation, excluding banned songs. Requests still take priority after the current song finishes. **Use for stream** returns to the saved order.
+
 Queue rows can be dragged or moved with buttons. You can also favourite songs, ban them or play them again from History. Playback controls stay available as you move around the app.
 
 Encore saves your queue and playlists between sessions. When you reopen it, playback starts paused.
