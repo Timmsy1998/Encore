@@ -1,0 +1,47 @@
+body {
+  margin: 0;
+  color: #eee;
+  font-family: system-ui;
+  background: transparent;
+}
+main {
+  margin: 16px;
+  padding: 22px;
+  display: flex;
+  gap: 22px;
+  align-items: center;
+  background: #1c1d1f;
+  border-left: 3px solid var(--accent, #e5aa73);
+  border-radius: 8px;
+}
+main[hidden] {
+  display: none;
+}
+.mark {
+  font-size: 36px;
+  color: var(--accent, #e5aa73);
+}
+small {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--accent, #e5aa73);
+}
+h1 {
+  font-size: 22px;
+  margin: 6px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 450px;
+}
+p {
+  margin: 0;
+  color: #b7b4b0;
+  font-size: 14px;
+}
+.compact {
+  padding: 12px;
+}
+.compact h1 {
+  font-size: 18px;
+}

@@ -2,6 +2,10 @@ import { z } from "zod";
 export const TrackSchema = z.object({
   id: z.string().regex(/^[a-zA-Z0-9_-]{6,64}$/),
   source: z.enum(["youtube", "spotify"]),
+  coverId: z
+    .string()
+    .regex(/^[a-f0-9]{40,64}$/)
+    .optional(),
   title: z.string().min(1).max(500),
   author: z.string().max(300).default(""),
   duration: z.number().positive().max(86400),

@@ -10,15 +10,13 @@ describe("provider authentication and input boundaries", () => {
     const auth = new URL(p.begin());
     expect(auth.searchParams.get("code_challenge_method")).toBe("S256");
     expect(auth.searchParams.has("client_secret")).toBe(false);
-    const fetch = vi
-      .fn()
-      .mockResolvedValue(
-        reply({
-          access_token: "access",
-          refresh_token: "refresh",
-          expires_in: 3600,
-        }),
-      );
+    const fetch = vi.fn().mockResolvedValue(
+      reply({
+        access_token: "access",
+        refresh_token: "refresh",
+        expires_in: 3600,
+      }),
+    );
     vi.stubGlobal("fetch", fetch);
     await p.callback(
       new URL(

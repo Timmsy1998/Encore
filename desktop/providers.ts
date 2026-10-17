@@ -123,6 +123,9 @@ export class Providers {
   private spotifyTrack(t: any, user: string): Track {
     return TrackSchema.parse({
       source: "spotify",
+      coverId: /^https:\/\/i\.scdn\.co\/image\/([a-f0-9]{40,64})$/.exec(
+        t.album?.images?.[0]?.url ?? "",
+      )?.[1],
       id: t.id,
       title: t.name,
       author: t.artists?.map((a: any) => a.name).join(", "),
