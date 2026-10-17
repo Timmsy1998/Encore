@@ -4,6 +4,7 @@ import {
   defaults,
   migrate,
   CommandSchema,
+  SettingsSchema,
   TrackSchema,
   key,
   type Track,
@@ -14,6 +15,30 @@ const track = (
   user = "Viewer",
   source: Track["source"] = "youtube",
 ): Track => ({ id, user, source, title: id, author: "Artist", duration: 180 });
+describe("partial settings commands", () => {
+  it("preserves setup progress and preferences when saving a Spotify client ID", () => {
+    const saved = SettingsSchema.parse({ setupStep: 4, volume: 23, wsPort: 9000 });
+    const clientId = "a".repeat(32);
+    const command = CommandSchema.parse({ type: "settings", settings: { clientId } });
+    if (command.type !== "settings") throw Error("Expected settings command");
+    expect(command.settings).toEqual({ clientId });
+    const updated = SettingsSchema.parse({ ...saved, ...command.settings });
+    expect(updated).toEqual({ ...saved, clientId });
+    const step = CommandSchema.parse({ type: "settings", settings: { setupStep: 5 } });
+    if (step.type !== "settings") throw Error("Expected settings command");
+    expect(SettingsSchema.parse({ ...updated, ...step.settings })).toEqual({
+      ...updated, setupStep: 5,
+    });
+  });
+  it("keeps empty updates empty and validates supplied fields", () => {
+    expect(CommandSchema.parse({ type: "settings", settings: {} })).toEqual({
+      type: "settings", settings: {},
+    });
+    for (const settings of [{ clientId: "invalid" }, { volume: 101 }, { setupStep: -1 }]) {
+      expect(CommandSchema.safeParse({ type: "settings", settings }).success).toBe(false);
+    }
+  });
+});
 describe("request and personal listening scheduling", () => {
   it("finishes current music, drains requests first, then listening, then rotates base", () => {
     const q = new Queue();

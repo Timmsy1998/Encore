@@ -36,6 +36,21 @@ export const SettingsSchema = z.object({
   reply: z.string().max(500).default("@{user} · {message}"),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
+// Defaults belong to full settings loads, never to a partial update. Zod's
+// partial() preserves inner defaults and would reset every omitted setting.
+type SettingsShape = typeof SettingsSchema.shape;
+const SettingsPatchSchema = z.object(
+  Object.fromEntries(
+    Object.entries(SettingsSchema.shape).map(([key, schema]) => [
+      key,
+      schema.removeDefault().optional(),
+    ]),
+  ) as {
+    [K in keyof SettingsShape]: z.ZodOptional<
+      ReturnType<SettingsShape[K]["removeDefault"]>
+    >;
+  },
+);
 export const StateSchema = z.object({
   version: z.literal(1),
   settings: SettingsSchema,
@@ -72,7 +87,7 @@ export type Snapshot = SavedState & {
   updateReady?: boolean;
 };
 export const CommandSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("settings"), settings: SettingsSchema.partial() }),
+  z.object({ type: z.literal("settings"), settings: SettingsPatchSchema }),
   z.object({
     type: z.literal("secrets"),
     youtube: z.string().max(250).optional(),

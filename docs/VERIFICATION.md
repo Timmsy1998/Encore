@@ -16,6 +16,12 @@ Verified on 2026-10-17. This is a development preview, not a real-account playba
 - Spotify redirect URI and overlay URL copy buttons now use named, validated main-process commands and Electron's native clipboard API. Browser clipboard permissions remain denied.
 - Node 24.11.0 on Linux/WSL: TypeScript, lint, all 31 tests, production build and nine Chromium UI checks passed. Real Electron smoke clicked both copy buttons and verified their exact native clipboard contents. Windows clipboard interaction has not been rechecked locally.
 
+## Spotify setup fix checks
+
+- Partial settings commands now validate supplied fields without applying defaults to omitted fields. Regression tests cover retaining setup progress, Spotify client ID and unrelated preferences across saves and step navigation, plus empty and invalid updates.
+- Node 24.11.0 on Linux/WSL: TypeScript, lint, all 33 unit/contract tests and production build passed. Nine Chromium UI checks passed. Real Electron smoke entered a client ID in setup, clicked Connect, verified the authorization URL and PKCE method, and confirmed setup progress, volume and client ID survived saving and continuing. Only the external browser launch was intercepted; the renderer, IPC validation and main-process settings/provider code ran normally.
+- Setup and playback documentation now explain Development Mode User Management and adding the Spotify account that will connect. Real-account authorization, audible playback and Windows behaviour remain unverified for this fix.
+
 ## GitHub updater checks
 
 - Node 24.11.0 on Linux/WSL: TypeScript, ESLint, all 31 unit/contract tests and production build passed. Updater tests cover stable-only downloads, explicit restart, in-flight deduplication, offline retry, periodic checks and unsupported-copy fallback. Release verification tests reject mismatched installer metadata.

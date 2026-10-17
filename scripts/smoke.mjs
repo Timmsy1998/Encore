@@ -44,6 +44,38 @@ try {
   const state = await window.evaluate(() => window.encore.snapshot());
   if (state.playing || state.current || state.queue.length)
     throw Error("Fresh profile must start empty and paused.");
+  // Keep authorization local while exercising the real setup and IPC path.
+  await app.evaluate(({ shell }) => {
+    globalThis.encoreSmokeOpenExternal = shell.openExternal;
+    shell.openExternal = async (url) => { globalThis.encoreSmokeAuthUrl = url; };
+  });
+  try {
+    await window.evaluate(() => window.encore.command({
+      type: "settings", settings: { setupStep: 4, volume: 23 },
+    }));
+    await window.getByLabel("Spotify Client ID").fill("a".repeat(32));
+    await window.getByRole("button", { name: "Connect Spotify", exact: true }).click();
+    await expect.poll(() => app.evaluate(() => globalThis.encoreSmokeAuthUrl))
+      .toContain("https://accounts.spotify.com/authorize?");
+    const authUrl = new URL(await app.evaluate(() => globalThis.encoreSmokeAuthUrl));
+    expect(authUrl.searchParams.get("client_id")).toBe("a".repeat(32));
+    expect(authUrl.searchParams.get("code_challenge_method")).toBe("S256");
+    const saved = await window.evaluate(() => window.encore.snapshot());
+    expect(saved.settings.setupStep).toBe(4);
+    expect(saved.settings.volume).toBe(23);
+    expect(saved.settings.clientId).toBe("a".repeat(32));
+    await window.getByRole("button", { name: "Continue / skip", exact: true }).click();
+    await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).settings.setupStep)
+      .toBe(5);
+    expect((await window.evaluate(() => window.encore.snapshot())).settings.clientId)
+      .toBe("a".repeat(32));
+  } finally {
+    await app.evaluate(({ shell }) => {
+      shell.openExternal = globalThis.encoreSmokeOpenExternal;
+      delete globalThis.encoreSmokeOpenExternal;
+      delete globalThis.encoreSmokeAuthUrl;
+    });
+  }
   await window.getByRole("button", { name: "Queue", exact: true }).click();
   await expect(
     window.getByRole("heading", { name: "Request queue" }),
@@ -72,7 +104,7 @@ try {
   );
   if (!denied) throw Error("Node unexpectedly exposed in renderer");
   console.log(
-    "Electron startup, preload, empty paused state, navigation and native clipboard passed.",
+    "Electron startup, preload, empty paused state, Spotify setup/authorization launch, navigation and native clipboard passed.",
   );
 } finally {
   await app.close();

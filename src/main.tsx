@@ -288,6 +288,12 @@ function App() {
       <Button variant="secondary" onClick={() => open("spotify")}>
         Spotify developer dashboard <ExternalLink size={14} />
       </Button>
+      <p>
+        For an app in Development Mode, open its User Management tab, choose
+        Add new user, and enter the name and Spotify email address of the
+        account you will connect. This account needs access for Web Playback
+        SDK playback. Then connect below using that same account.
+      </p>
       <Field
         label="Redirect URI"
         hint="Add this exact URI to your Spotify application."
