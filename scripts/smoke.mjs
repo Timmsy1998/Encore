@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import { mkdtemp, rm, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 const profile = await mkdtemp(resolve(tmpdir(), "encore-smoke-"));
+// Some Windows development shells inherit this flag from their host editor.
+delete process.env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({
   executablePath:
     process.env.ENCORE_SMOKE_EXE ||
@@ -19,7 +21,23 @@ const app = await electron.launch({
   timeout: 60000,
 });
 try {
-  const window = await app.firstWindow({ timeout: 60000 });
+  // Provider WebContentsView pages can arrive before the application window.
+  let window;
+  await expect
+    .poll(async () => {
+      for (const page of app.windows()) {
+        const isPlayer = await page
+          .evaluate(() => typeof window.encore !== "undefined")
+          .catch(() => false);
+        if (isPlayer) {
+          window = page;
+          return true;
+        }
+      }
+      return false;
+    }, { timeout: 60000 })
+    .toBe(true);
+  if (!window) throw Error("Encore application window did not load.");
   await expect(
     window.getByRole("heading", { name: "Set up Encore" }),
   ).toBeVisible();
@@ -31,7 +49,7 @@ try {
     window.getByRole("heading", { name: "Request queue" }),
   ).toBeVisible();
   await mkdir("test-results", { recursive: true });
-  await window.screenshot({ path: "test-results/electron-workspace.png" });
+  await window.screenshot({ path: "test-results/electron-player.png" });
   const denied = await window.evaluate(
     () =>
       typeof window.require === "undefined" &&

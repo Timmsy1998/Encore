@@ -819,6 +819,7 @@ function createMain() {
     /* default on first run or invalid bounds */
   }
   main = new BrowserWindow({
+    icon: join(root, "icon.png"),
     ...bounds,
     minWidth: 760,
     minHeight: 600,
@@ -975,15 +976,10 @@ if (!app.requestSingleInstanceLock()) {
         await serial(() => command(result.data), true);
       });
       createMain();
-      const bitmap = Buffer.alloc(16 * 16 * 4);
-      for (let i = 0; i < bitmap.length; i += 4) {
-        bitmap[i] = 115;
-        bitmap[i + 1] = 170;
-        bitmap[i + 2] = 229;
-        bitmap[i + 3] = 255;
-      }
       tray = new Tray(
-        nativeImage.createFromBitmap(bitmap, { width: 16, height: 16 }),
+        nativeImage
+          .createFromPath(join(root, "icon.png"))
+          .resize({ width: 16, height: 16 }),
       );
       tray.setToolTip("Encore · song requests");
       tray.setContextMenu(
