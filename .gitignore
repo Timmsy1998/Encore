@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-electron/
+release/
+playwright-report/
+test-results/
+coverage/
+*.tsbuildinfo
+.env*
+encore-data/
+.runtime/
+Encore-data/

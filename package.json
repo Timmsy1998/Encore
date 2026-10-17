@@ -1,0 +1,91 @@
+{
+  "name": "encore-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Desktop song request control for Streamer.bot, based on Better Song Request",
+  "author": "Encore contributors; upstream HackMe_",
+  "license": "GPL-3.0-only",
+  "repository": "https://github.com/Timmsy1998/Encore",
+  "main": "dist-electron/main.cjs",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "npm run build && npm run runtime && node scripts/dev.mjs",
+    "preview": "vite --host 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src desktop tests scripts --max-warnings 0",
+    "test": "vitest run",
+    "build": "vite build && node scripts/build.mjs",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "package:win": "npm run build && node scripts/runtime.mjs win32 && electron-builder --win --x64",
+    "test:ui": "playwright test",
+    "runtime": "node scripts/runtime.mjs",
+    "test:desktop": "node scripts/smoke.mjs"
+  },
+  "build": {
+    "appId": "io.encore.desktop",
+    "productName": "Encore",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "LICENSE",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "signAndEditExecutable": true
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Encore-${version}-windows-${arch}-installer.${ext}"
+    },
+    "publish": null,
+    "electronVersion": "44.5.1",
+    "electronDist": ".runtime/win32",
+    "portable": {
+      "artifactName": "Encore-${version}-windows-${arch}-portable.${ext}"
+    },
+    "afterSign": "scripts/vmp.cjs"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "1.5.0",
+    "@radix-ui/react-switch": "1.4.1",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "lucide-react": "1.59.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "tailwind-merge": "3.7.0",
+    "ws": "8.22.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/ws": "8.18.2",
+    "@vitejs/plugin-react": "6.1.2",
+    "electron": "41.10.7",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
+    "eslint": "10.13.0",
+    "extract-zip": "2.0.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.2",
+    "vite": "8.3.4",
+    "vitest": "4.1.12"
+  },
+  "type": "module"
+}
