@@ -33,6 +33,21 @@ async function boot(page: Page, setup = false, updateReady = false) {
         };
       },
       command: async (c) => {
+        const commands = JSON.parse(localStorage.getItem("fixture-commands") || "[]");
+        commands.push(c); localStorage.setItem("fixture-commands", JSON.stringify(commands));
+        if (c.type === "playlistReorder") {
+          const from = state.playlists.findIndex((item: { id: string }) => item.id === c.id);
+          state.playlists.splice(c.to, 0, state.playlists.splice(from, 1)[0]);
+        }
+        if (c.type === "playlistMove") {
+          const tracks = state.playlists.find((item: { id: string }) => item.id === c.id).tracks;
+          tracks.splice(c.to, 0, tracks.splice(c.from, 1)[0]);
+        }
+        if (c.type === "playlistCreate") state.playlists.push({ id: c.id, name: c.name, tracks: [] });
+        if (c.type === "playlistDelete") {
+          state.playlists = state.playlists.filter((item: { id: string }) => item.id !== c.id);
+          if (state.activePlaylistId === c.id) { state.activePlaylistId = null; state.base = []; }
+        }
         if (c.type === "settings") Object.assign(state.settings, c.settings);
         if (c.type === "playlistActivate") {
           state.activePlaylistId = c.id;
@@ -76,11 +91,11 @@ test("resumable wizard and optional services", async ({ page }) => {
   ).toBeVisible();
   await page.getByRole("button", { name: "Open player" }).click();
   await expect(
-    page.getByRole("heading", { name: "Request queue" }),
+    page.getByRole("heading", { name: "Queue / Up Next" }),
   ).toBeVisible();
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Request queue" }),
+    page.getByRole("heading", { name: "Queue / Up Next" }),
   ).toBeVisible();
 });
 test("personal listening, errors, navigation and window scaling", async ({
@@ -99,7 +114,7 @@ test("personal listening, errors, navigation and window scaling", async ({
   await expect(
     page.getByRole("textbox", { name: "Add listening track" }),
   ).toHaveValue("A song to find");
-  for (const name of ["Overlay", "Settings", "About", "Queue"]) {
+  for (const name of ["Overlay", "Settings", "About", "Playlists", "Queue / Up Next"]) {
     await page.getByRole("button", { name, exact: true }).click();
     expect(
       await page.evaluate(
@@ -139,7 +154,7 @@ test("downloaded update stays available across navigation and restarts only on r
 
 test("playlist imports show progress, completion and failure without losing saved tracks", async ({ page }) => {
   await boot(page);
-  await page.getByRole("button", { name: "Listening", exact: true }).click();
+  await page.getByRole("button", { name: "Playlists", exact: true }).click();
   await page.evaluate(() => {
     const command = window.encore.command;
     window.encore.command = async value => {
@@ -148,6 +163,7 @@ test("playlist imports show progress, completion and failure without losing save
       await command(value);
     };
   });
+  await page.getByText("Import directly into the stream rotation", { exact: true }).click();
   const input = page.getByLabel("Base playlist URL");
   await input.fill("https://www.youtube.com/playlist?list=PLabcdefghijk");
   await page.getByRole("button", { name: "Import playlist", exact: true }).click();
@@ -161,6 +177,7 @@ test("playlist imports show progress, completion and failure without losing save
   await page.evaluate(() => window.dispatchEvent(new Event("finish-import")));
   await expect(page.getByRole("alert")).toContainText("Playlist unavailable");
   await expect(page.getByText("your saved playlist is unchanged", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Queue / Up Next", exact: true }).click();
   await expect(page.getByText("Imported fixture", { exact: true })).toBeVisible();
 });
 
@@ -351,7 +368,7 @@ test("Canvas follows playback silently, cleans up and falls back to covers", asy
 });
 
 
-test("saved mixed playlist controls fit desktop scaling and survive navigation", async ({ page }) => {
+test("saved playlists stay closed until opened and can be arranged with buttons and drag", async ({ page }, testInfo) => {
   await boot(page);
   await page.evaluate(async () => {
     const state = await window.encore.snapshot();
@@ -359,25 +376,84 @@ test("saved mixed playlist controls fit desktop scaling and survive navigation",
     state.playlists = [{ id, name: "Mixed stream", tracks: [
       { id: "a".repeat(22), source: "spotify", title: "Spotify favourite", author: "Artist", duration: 180, user: "Auto" },
       { id: "abcdefghijk", source: "youtube", title: "YouTube exclusive", author: "Artist", duration: 180, user: "Auto" },
-    ] }];
+    ] }, { id: "22222222-2222-4222-8222-222222222222", name: "Evening collection", tracks: [] }];
     state.activePlaylistId = id;
     state.base = state.playlists[0].tracks;
     localStorage.setItem("fixture-state", JSON.stringify(state));
   });
   await page.reload();
-  await page.getByRole("button", { name: "Listening", exact: true }).click();
+  await page.getByRole("button", { name: "Playlists", exact: true }).click();
   const library = page.getByRole("region", { name: "Saved playlists" });
-  await expect(library.getByRole("status")).toHaveText("Stream playlist: Mixed stream");
-  await expect(library.getByRole("listitem")).toHaveCount(2);
+  const cards = library.getByRole("list", { name: "Playlist library", exact: true });
+  await expect(library.getByText("Stream playlist: Mixed stream", { exact: true })).toBeVisible();
+  await expect(library.getByText("Spotify favourite", { exact: true })).toHaveCount(0);
+  await expect(cards.getByRole("listitem")).toHaveCount(2);
+  await library.getByRole("button", { name: "Move playlist Evening collection up", exact: true }).click();
+  await expect(cards.getByRole("listitem").first()).toContainText("Evening collection");
+  await page.reload();
+  await page.getByRole("button", { name: "Playlists", exact: true }).click();
+  await expect(cards.getByRole("listitem").first()).toContainText("Evening collection");
+  await library.getByRole("button", { name: "Drag playlist Mixed stream", exact: true }).dragTo(cards.getByRole("listitem").first());
+  await expect(cards.getByRole("listitem").first()).toContainText("Mixed stream");
+  await library.getByRole("button", { name: "Open playlist Mixed stream", exact: true }).click();
+  const tracks = library.getByRole("list", { name: "Mixed stream tracks", exact: true });
+  await expect(tracks.getByRole("listitem")).toHaveCount(2);
   await library.getByRole("button", { name: "Shuffle for stream", exact: true }).click();
   await expect(library.getByText("Shuffle is on.", { exact: false })).toBeVisible();
   await expect(library.getByRole("button", { name: "Move Spotify favourite up", exact: true })).toBeDisabled();
   await expect(library.getByRole("button", { name: "Move YouTube exclusive down", exact: true })).toBeDisabled();
+  const move = library.getByRole("button", { name: "Move YouTube exclusive up", exact: true });
+  await move.focus(); await page.keyboard.press("Enter");
+  await expect(tracks.getByRole("listitem").first()).toContainText("YouTube exclusive");
+  await library.getByRole("button", { name: "Drag song Spotify favourite", exact: true }).dragTo(tracks.getByRole("listitem").first());
+  await expect(tracks.getByRole("listitem").first()).toContainText("Spotify favourite");
   expect(await page.locator(".content").evaluate(e => e.scrollWidth <= e.clientWidth + 1)).toBe(true);
-  await page.getByRole("button", { name: "Queue", exact: true }).click();
-  await page.getByRole("button", { name: "Listening", exact: true }).click();
-  await expect(library.getByRole("listitem")).toHaveCount(2);
-  await expect(library.getByText("Shuffle is on.", { exact: false })).toBeVisible();
+  await page.screenshot({ path: `test-results/playlists-open-${testInfo.project.name}.png` });
+  await library.getByRole("button", { name: "All playlists", exact: true }).click();
+  await expect(library.getByText("Spotify favourite", { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: `test-results/playlists-library-${testInfo.project.name}.png` });
+  await page.getByRole("button", { name: "Queue / Up Next", exact: true }).click();
+  await page.getByRole("button", { name: "Playlists", exact: true }).click();
+  await expect(library.getByText("Spotify favourite", { exact: true })).toHaveCount(0);
+  await library.getByRole("button", { name: "Open playlist Mixed stream", exact: true }).click();
   await library.getByRole("button", { name: "Use for stream", exact: true }).click();
   await expect(library.getByText("Shuffle is on.", { exact: false })).toHaveCount(0);
+  await library.getByRole("button", { name: "Delete playlist", exact: true }).click();
+  await library.getByRole("button", { name: "Confirm delete", exact: true }).click();
+  await expect(library.getByRole("button", { name: "Open playlist Evening collection", exact: true })).toBeVisible();
+  await expect(library.getByRole("heading", { name: "Evening collection", exact: true })).toHaveCount(0);
+  await library.getByRole("textbox", { name: "New playlist name" }).fill("New collection");
+  await library.getByRole("button", { name: "Create playlist", exact: true }).click();
+  await expect(library.getByRole("button", { name: "Open playlist New collection", exact: true })).toBeVisible();
+  await expect(library.getByRole("textbox", { name: "Playlist song or URL" })).toHaveCount(0);
+});
+
+test("up next shows current music, requester text and all playback lanes without navigation commands", async ({ page }, testInfo) => {
+  await boot(page);
+  await page.evaluate(async () => {
+    const state = await window.encore.snapshot();
+    const track = { id: "abcdefghijk", source: "youtube" as const, title: "Current song", author: "Artist", duration: 180, user: "First viewer" };
+    state.current = track; state.playing = true;
+    state.queue = [{ ...track, id: "request0001", title: "Requested song", user: "<b>Viewer</b>" }];
+    state.listening = [{ ...track, id: "personal001", title: "Personal song", user: "Streamer" }];
+    state.base = [{ ...track, id: "banned00001", title: "Banned rotation song", user: "Auto" }, { ...track, id: "base0000001", title: "Rotation song", user: "Auto" }];
+    state.banned = ["youtube:banned00001"];
+    localStorage.setItem("fixture-state", JSON.stringify(state));
+  });
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Current track", exact: true })).toContainText("Requested by First viewer");
+  await expect(page.getByText("Requested by <b>Viewer</b>", { exact: false })).toBeVisible();
+  await expect(page.locator(".track-info b").filter({ hasText: "Viewer" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Personal listening up next", exact: true })).toContainText("Personal song");
+  await expect(page.getByRole("region", { name: "Stream playlist up next", exact: true })).toContainText("Rotation song");
+  await expect(page.getByText("Banned rotation song", { exact: true })).toHaveCount(0);
+  await page.getByRole("searchbox", { name: "Filter tracks" }).fill("Viewer");
+  await expect(page.getByText("Requested song", { exact: true })).toBeVisible();
+  await expect(page.getByText("Personal song", { exact: true })).toHaveCount(0);
+  await page.getByRole("searchbox", { name: "Filter tracks" }).fill("");
+  await page.screenshot({ path: `test-results/up-next-${testInfo.project.name}.png` });
+  for (const name of ["Playlists", "Listening", "Queue / Up Next"]) await page.getByRole("button", { name, exact: true }).click();
+  expect(await page.evaluate(() => localStorage.getItem("fixture-commands"))).toBeNull();
+  await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
+  expect(await page.locator(".content").evaluate(e => e.scrollWidth <= e.clientWidth + 1)).toBe(true);
 });

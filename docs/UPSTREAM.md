@@ -26,8 +26,8 @@ For Encore's Spotify-first text search, actions must send the song-and-artist te
 | --- | --- |
 | Playback | Spotify and YouTube inside the desktop app |
 | Queue | Requests, then personal listening, then a rotating stream playlist; current song finishes first |
-| Playlists | Saved mixed Spotify/YouTube playlists, provider imports and shuffled stream rotation; requests retain priority |
-| Queue ordering | Drag and drop or move buttons |
+| Playlists | Separate library page, closed until opened; mixed Spotify/YouTube imports, saved playlist/song ordering with drag handles and move buttons, and shuffled stream rotation |
+| Queue ordering | Queue / Up Next shows requester details, personal listening and a stream-rotation preview; request ordering uses drag and drop or move buttons |
 | Skip votes | One vote per viewer |
 | Wrong song | Removes the viewer's last pending request |
 | Bans, favourites and history | Saved between sessions; history keeps up to 1,000 songs |

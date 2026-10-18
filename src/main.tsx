@@ -10,6 +10,7 @@ import { createRoot } from "react-dom/client";
 import {
   AudioLines,
   ListMusic,
+  Library,
   Heart,
   History,
   Settings2,
@@ -56,6 +57,7 @@ function OverlayPreview({ state, appearance }: { state: Snapshot; appearance: Ov
 const pages = [
   "Queue",
   "Listening",
+  "Playlists",
   "Favourites",
   "History",
   "Overlay",
@@ -74,6 +76,7 @@ function artwork(track: Track) {
 const icons = [
   ListMusic,
   Music2,
+  Library,
   Heart,
   History,
   Radio,
@@ -204,6 +207,7 @@ function App() {
       </main>
     );
   const settings = { ...s.settings, ...draft };
+  const upcomingBase = s.base.filter(track => !s.banned.includes(key(track)));
   const settingsForm = (
     <div className="form-grid">
       <Field
@@ -371,7 +375,7 @@ function App() {
       </p>
       <Field
         label="Base playlist URL"
-        hint="Public or unlisted YouTube playlists, or Spotify playlists you own or collaborate on. Up to 1,000 entries. A successful import replaces the stream playlist selection. Use Your playlists in Listening to save and mix imports."
+        hint="Public or unlisted YouTube playlists, or Spotify playlists you own or collaborate on. Up to 1,000 entries. A successful import replaces the stream playlist selection. Open Playlists to save and mix imports."
       >
         <input
           value={playlist}
@@ -521,7 +525,7 @@ function App() {
               <div className="track-info">
                 <strong>{t.title}</strong>
                 <span>
-                  {t.author} <b>·</b> {t.user}
+                  {t.author} <b>·</b> {kind === "request" ? `Requested by ${t.user}` : kind === "base" ? "Stream playlist" : t.user}
                 </span>
               </div>
               <span className={`source ${t.source}`}>
@@ -650,10 +654,12 @@ function App() {
                   setPage(p);
                   setSearch("");
                 }}
-                title={p}
+                title={p === "Queue" ? "Queue / Up Next" : p}
+                aria-label={p === "Queue" ? "Queue / Up Next" : p}
+                aria-current={page === p ? "page" : undefined}
               >
                 <Icon size={18} />
-                <span>{p}</span>
+                <span>{p === "Queue" ? "Queue / Up Next" : p}</span>
                 {p === "Queue" && s.queue.length > 0 && (
                   <em>{s.queue.length}</em>
                 )}
@@ -675,7 +681,7 @@ function App() {
       </aside>
       <header className="topbar">
         <span className="breadcrumb">
-          Your music, in good company <span>/ {page}</span>
+          Your music, in good company <span>/ {page === "Queue" ? "Queue / Up Next" : page}</span>
         </span>
         <Toggle
           label="Accept requests"
@@ -705,10 +711,10 @@ function App() {
                   <span className="eyebrow">
                     {page === "Queue" ? "UP NEXT" : "YOUR LIBRARY"}
                   </span>
-                  <h1>{page === "Queue" ? "Request queue" : page}</h1>
+                  <h1>{page === "Queue" ? "Queue / Up Next" : page}</h1>
                   <p>
                     {page === "Queue"
-                      ? "Viewer requests get the next turn."
+                      ? "Requests first, then your listening queue, then the stream playlist. The current song finishes first."
                       : page === "Listening"
                         ? "Music for you, with or without Streamer.bot."
                         : page === "Favourites"
@@ -718,7 +724,7 @@ function App() {
                 </div>
                 <span className="count">
                   {page === "Queue"
-                    ? s.queue.length
+                    ? s.queue.length + s.listening.length
                     : page === "Listening"
                       ? s.listening.length
                       : page === "Favourites"
@@ -727,6 +733,13 @@ function App() {
                   tracks
                 </span>
               </div>
+              {page === "Queue" && <section className="queue-current" aria-label="Current track">
+                <span className="eyebrow">{s.current ? (s.playing ? "NOW PLAYING" : "PAUSED") : "READY WHEN YOU ARE"}</span>
+                {s.current ? <>
+                  <h2>{s.current.title}</h2>
+                  <p>{s.current.author} · {s.currentLane === "request" ? `Requested by ${s.current.user}` : s.currentLane === "base" ? "Stream playlist" : "Personal listening"}</p>
+                </> : <p>No current track. Add music, then press Play.</p>}
+              </section>}
               {["Queue", "Listening"].includes(page) && (
                 <form className="add-track" onSubmit={add}>
                   <Plus size={18} />
@@ -769,18 +782,28 @@ function App() {
                     ? "listening"
                     : "saved",
               )}
-              {page === "Listening" && (
-                <>
-                  <PlaylistLibrary state={s} busy={busy} send={send} />
-                  <section className="section">
-                    <h2>When the queues are quiet</h2>
-                    {baseForm}
-                    {rows(s.base, "base")}
-                  </section>
-                </>
-              )}
+              {page === "Queue" && <>
+                <section className="section queue-lane" aria-label="Personal listening up next">
+                  <h2>Then · Personal listening <span className="count">{s.listening.length} tracks</span></h2>
+                  {rows(s.listening, "listening")}
+                </section>
+                <section className="section queue-lane" aria-label="Stream playlist up next">
+                  <h2>Then · Stream playlist</h2>
+                  <p>{s.playlists.find(item => item.id === s.activePlaylistId)?.name ?? "Background rotation"} · {upcomingBase.length} available tracks{s.baseShuffle ? " · Shuffled" : ""}. Showing up to five next in the rotation; new requests take priority.</p>
+                  {upcomingBase.length ? rows(upcomingBase.slice(0, 5), "base") : <p>No available stream tracks. Choose a playlist or review bans on the Playlists and Settings pages.</p>}
+                </section>
+              </>}
             </>
           )}
+          {page === "Playlists" && <>
+            <div className="page-heading"><div><span className="eyebrow">YOUR LIBRARY</span><h1>Playlists</h1><p>A home for your music. Mix services, arrange songs, and choose your stream soundtrack.</p></div><span className="count">{s.playlists.length} playlists</span></div>
+            <PlaylistLibrary state={s} busy={busy} send={send} />
+            <details className="section legacy-import">
+              <summary>Import directly into the stream rotation</summary>
+              <p>Replaces the current stream rotation. To keep an editable collection, open a saved playlist above and use Append playlist.</p>
+              {baseForm}
+            </details>
+          </>}
           {page === "Setup" && (
             <>
               <div className="page-heading">

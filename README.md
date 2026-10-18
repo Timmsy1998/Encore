@@ -45,13 +45,15 @@ You can set request limits, bans, skip votes and chat replies in Encore's Settin
 
 ## Your music
 
-Open **Listening → Your playlists** to create a playlist. Add individual songs from either service, or use **Append playlist** to bring in a Spotify or YouTube playlist. You can rename playlists, change their order and remove songs whenever you like.
+Open **Playlists** to create a playlist. Collections stay closed until you select **Open playlist**; returning to the library or navigating away closes the contents. Add individual songs from either service, or use **Append playlist** to bring in a Spotify or YouTube playlist. You can rename playlists, arrange playlists and songs with drag handles or keyboard-accessible move buttons, and remove songs whenever you like. Library order is saved separately from playback rotation.
 
 Choose **Use for stream** to make a playlist your background music. Requests still go first, followed by anything in your personal listening queue. Changing the stream playlist won't cut off the current song.
 
 Choose **Shuffle for stream** to randomise its playback order without changing the saved playlist. Every song plays once per rotation, excluding banned songs. Requests still take priority after the current song finishes. **Use for stream** returns to the saved order.
 
 Queue rows can be dragged or moved with buttons. You can also favourite songs, ban them or play them again from History. Playback controls stay available as you move around the app.
+
+**Queue / Up Next** shows the current track, requests with requester names, personal listening, and a preview of the next five stream-playlist tracks in playback order. Filter by song, artist or requester. Use **Listening** to add personal music and **Playlists** to manage saved collections.
 
 Encore saves your queue and playlists between sessions. When you reopen it, playback starts paused.
 

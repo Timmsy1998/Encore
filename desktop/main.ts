@@ -401,6 +401,7 @@ async function command(c: Command) {
   const playlists = new Playlists(queue.state);
   switch (c.type) {
     case "playlistCreate": playlists.create(c.id, c.name); break;
+    case "playlistReorder": playlists.reorder(c.id, c.to); break;
     case "playlistRename": playlists.rename(c.id, c.name); break;
     case "playlistDelete": playlists.delete(c.id); break;
     case "playlistActivate": playlists.activate(c.id, c.shuffle); break;

@@ -125,6 +125,7 @@ export type Snapshot = SavedState & {
 };
 export const CommandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("playlistCreate"), id: z.uuid(), name: z.string().trim().min(1).max(80) }),
+  z.object({ type: z.literal("playlistReorder"), id: z.uuid(), to: z.number().int().nonnegative() }),
   z.object({ type: z.literal("playlistRename"), id: z.uuid(), name: z.string().trim().min(1).max(80) }),
   z.object({ type: z.literal("playlistDelete"), id: z.uuid() }),
   z.object({ type: z.literal("playlistActivate"), id: z.uuid(), shuffle: z.boolean().default(false) }),

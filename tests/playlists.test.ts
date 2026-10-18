@@ -94,6 +94,25 @@ describe("saved mixed playlists", () => {
     expect(q.state.activePlaylistId).toBeNull();
     expect(q.next()).toBeNull();
   });
+  it("persists library reordering without changing playback and rejects stale destinations", () => {
+    const q = new Queue(); const library = new Playlists(q.state);
+    library.create(id, "First"); library.append(id, [spotify, youtube]); library.activate(id); q.next();
+    library.create(otherId, "Second");
+    const base = structuredClone(q.state.base);
+    const current = q.current;
+    library.reorder(otherId, 0);
+    expect(q.state.playlists.map(item => item.id)).toEqual([otherId, id]);
+    expect(q.state.base).toEqual(base); expect(q.current).toBe(current);
+    const restored = migrate(JSON.parse(JSON.stringify(q.persisted())));
+    expect(restored.playlists.map(item => item.id)).toEqual([otherId, id]);
+    const before = structuredClone(q.state);
+    for (const to of [-1, 2, 0.5]) expect(() => library.reorder(id, to)).toThrow();
+    expect(() => library.reorder("missing", 0)).toThrow();
+    expect(q.state).toEqual(before);
+    expect(CommandSchema.safeParse({ type: "playlistReorder", id, to: -1 }).success).toBe(false);
+    expect(CommandSchema.safeParse({ type: "playlistReorder", id: "missing", to: 0 }).success).toBe(false);
+    expect(CommandSchema.parse({ type: "playlistReorder", id, to: 1 })).toEqual({ type: "playlistReorder", id, to: 1 });
+  });
   it("rejects invalid edits atomically and preserves older base playlists on migration", () => {
     const state = defaults(); const library = new Playlists(state);
     library.create(id, "Mix");

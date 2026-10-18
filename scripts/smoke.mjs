@@ -149,9 +149,17 @@ try {
       await expect(window.getByRole("alert")).toContainText("YouTube playlist not found");
       expect((await window.evaluate(() => window.encore.snapshot())).base[0]?.title).toBe("YouTube import smoke");
       // Build and persist a mixed playlist through the real UI, IPC and providers.
-      await window.getByRole("button", { name: "Listening", exact: true }).click();
+      await window.getByRole("button", { name: "Playlists", exact: true }).click();
       await window.getByLabel("New playlist name").fill("Mixed stream");
       await window.getByRole("button", { name: "Create playlist", exact: true }).click();
+      await expect(window.getByLabel("Playlist song or URL")).toHaveCount(0);
+      await window.getByLabel("New playlist name").fill("Later collection");
+      await window.getByRole("button", { name: "Create playlist", exact: true }).click();
+      await window.getByRole("button", { name: "Move playlist Later collection up", exact: true }).click();
+      await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).playlists[0].name).toBe("Later collection");
+      await window.getByRole("button", { name: "Move playlist Later collection down", exact: true }).click();
+      await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).playlists[0].name).toBe("Mixed stream");
+      await window.getByRole("button", { name: "Open playlist Mixed stream", exact: true }).click();
       for (const input of ["https://open.spotify.com/playlist/" + "a".repeat(22), "https://www.youtube.com/playlist?list=PLabcdefghijk"]) {
         await window.getByLabel("Playlist song or URL").fill(input);
         await window.getByRole("button", { name: "Append playlist", exact: true }).click();
@@ -164,8 +172,10 @@ try {
       await window.getByRole("button", { name: "Move YouTube import smoke up", exact: true }).click();
       await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).playlists[0].tracks[0].source).toBe("youtube");
       await window.reload();
-      await window.getByRole("button", { name: "Listening", exact: true }).click();
+      await window.getByRole("button", { name: "Playlists", exact: true }).click();
       await expect(window.getByRole("status").filter({ hasText: "Stream playlist: Mixed stream" })).toBeVisible();
+      await expect(window.getByLabel("Playlist song or URL")).toHaveCount(0);
+      await window.getByRole("button", { name: "Open playlist Mixed stream", exact: true }).click();
       await window.getByLabel("Rename playlist").fill("Mixed favourites");
       await window.getByRole("button", { name: "Rename", exact: true }).click();
       await expect(window.getByRole("list", { name: "Mixed favourites tracks" }).getByRole("listitem")).toHaveCount(2);
@@ -192,9 +202,9 @@ try {
       delete globalThis.encoreSmokeAuthUrl;
     });
   }
-  await window.getByRole("button", { name: "Queue", exact: true }).click();
+  await window.getByRole("button", { name: "Queue / Up Next", exact: true }).click();
   await expect(
-    window.getByRole("heading", { name: "Request queue" }),
+    window.getByRole("heading", { name: "Queue / Up Next" }),
   ).toBeVisible();
   // Exercise the actual renderer → validated IPC → native clipboard path.
   const previousClipboard = await app.evaluate(({ clipboard }) => clipboard.readText());
@@ -264,7 +274,7 @@ try {
   } finally {
     await app.evaluate(({ clipboard }, text) => clipboard.writeText(text), previousClipboard);
   }
-  await window.getByRole("button", { name: "Queue", exact: true }).click();
+  await window.getByRole("button", { name: "Queue / Up Next", exact: true }).click();
   await mkdir("test-results", { recursive: true });
   await window.screenshot({ path: "test-results/electron-player.png" });
   const denied = await window.evaluate(

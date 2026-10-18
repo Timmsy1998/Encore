@@ -22,6 +22,13 @@ export class Playlists {
     if (this.state.playlists.some(item => item.id === id)) throw Error("Playlist already exists.");
     this.state.playlists.push(PlaylistSchema.parse({ id, name, tracks: [] }));
   }
+  reorder(id: string, to: number) {
+    const playlist = this.get(id);
+    if (!Number.isInteger(to) || to < 0 || to >= this.state.playlists.length)
+      throw Error("Playlist library changed; try again.");
+    const from = this.state.playlists.indexOf(playlist);
+    this.state.playlists.splice(to, 0, this.state.playlists.splice(from, 1)[0]);
+  }
   rename(id: string, name: string) {
     const playlist = this.get(id);
     playlist.name = PlaylistSchema.shape.name.parse(name);
