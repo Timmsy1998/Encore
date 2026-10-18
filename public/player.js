@@ -6,12 +6,15 @@ let yt,
   connecting = false;
 let state = null,
   ytKey = "",
+  ytPlayingKey = "",
   intent = -1,
   spotifyActive = false;
 let spotifyPrevious = null,
   observationTime = 0,
   endedGeneration = -1,
-  observedGeneration = -1;
+  observedGeneration = -1,
+  pendingEnd = null,
+  endReporting = false;
 const status = document.querySelector("#status");
 const auth = {
   Authorization: "Bearer " + new URLSearchParams(location.search).get("token"),
@@ -34,13 +37,35 @@ function report(event, extra = {}) {
     ...extra,
   }).catch(() => {
     status.textContent = "Encore disconnected. Restart the app to reconnect.";
+    return false;
   });
 }
 function ended(expected = state) {
   if (expected?.generation !== state?.generation) return;
   if (endedGeneration === state.generation) return;
-  endedGeneration = state.generation;
-  void report("ended");
+  pendingEnd = expected;
+  if (endReporting) return;
+  endReporting = true;
+  void report("ended").then((delivered) => {
+    if (delivered !== false) {
+      endedGeneration = expected.generation;
+      if (pendingEnd?.generation === expected.generation) pendingEnd = null;
+    }
+  }).finally(() => { endReporting = false; });
+}
+function observeYouTube(playbackState) {
+  if (
+    state?.current?.source !== "youtube" ||
+    !state.playing ||
+    ytKey !== "youtube:" + state.current.id + ":" + state.trackGeneration ||
+    yt.getVideoData().video_id !== state.current.id
+  ) return;
+  if (playbackState === 1) {
+    ytPlayingKey = ytKey;
+    status.textContent = "YouTube · playing in Encore";
+  }
+  // A newly loaded rotation can still expose the previous video's ended state.
+  if (playbackState === 0 && ytPlayingKey === ytKey) ended();
 }
 window.encorePause = async () => {
   intent = -1;
@@ -59,15 +84,7 @@ window.onYouTubeIframeAPIReady = () => {
         update();
       },
       onStateChange: (event) => {
-        if (state?.current?.source !== "youtube" || !state.playing) return;
-        if (
-          event.data === 0 &&
-          ytKey === "youtube:" + state.current.id + ":" + state.trackGeneration &&
-          yt.getVideoData().video_id === state.current.id
-        )
-          ended();
-        if (event.data === 1)
-          status.textContent = "YouTube · playing in Encore";
+        observeYouTube(event.data);
       },
       onAutoplayBlocked: () => {
         if (state?.current?.source !== "youtube" || !state.playing) return;
@@ -219,6 +236,7 @@ async function update() {
       yt.setVolume(state.volume);
       if (ytKey !== id) {
         ytKey = id;
+        ytPlayingKey = "";
         intent = state.playing ? state.generation : -1;
         if (state.playing) {
           // Loading starts playback atomically; cue + immediate play races the iframe.
@@ -260,15 +278,22 @@ stream.onerror = () => {
 };
 // Sample local SDK state; this makes no Web API requests and detects track endings reliably.
 const sampler = setInterval(() => {
+  // Retry a failed local delivery for either provider, even after Spotify pauses.
+  if (pendingEnd) {
+    if (pendingEnd.generation === state?.generation && state.playing) ended(pendingEnd);
+    else pendingEnd = null;
+  }
   if (spotify && spotifyActive && state?.playing)
     spotify
       .getCurrentState()
       .then(observeSpotify)
       .catch(() => report("not_ready"));
   if (ytReady && state?.current?.source === "youtube" && yt.getVideoData().video_id === state.current.id) {
+    const playbackState = yt.getPlayerState();
+    observeYouTube(playbackState);
     const position = yt.getCurrentTime();
     if (Number.isFinite(position))
-      void report("progress", { position, active: yt.getPlayerState() === 1 });
+      void report("progress", { position, active: playbackState === 1 });
   }
 }, 1000);
 window.addEventListener("beforeunload", () => {

@@ -40,6 +40,8 @@ Choose **Use for stream** to play it whenever requests and personal listening ar
 
 **Shuffle for stream** randomises the playback copy once, then rotates through that order without repeats within a rotation. Saved song order stays intact, banned songs are skipped, and requests and personal listening still go first. Playlist edits preserve the shuffled rotation, with new songs appended in random order. Shuffle and the upcoming order survive restarts; playback still reopens paused. Choose **Use for stream** to restore saved order, or choose **Shuffle for stream** again for a new random order.
 
+YouTube completion is checked through both player events and local player-state sampling, so a missed end event can still advance the rotation. Paused, buffering and cued tracks do not trigger advancement. Both providers retry failed local completion reports until delivered or playback changes.
+
 The original **Base playlist** URL import replaces the stream selection. It doesn't delete named playlists. Use **Append playlist** when you want to add an import to an existing saved playlist.
 
 ## OBS artwork and audio

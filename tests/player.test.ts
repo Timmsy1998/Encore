@@ -5,10 +5,13 @@ import { expect, it, vi } from "vitest";
 async function player() {
   const events: any[] = [];
   let stream: any;
+  let sample!: () => void;
+  let failedEndings = 0;
   let model: any = {
     current: { source: "youtube", id: "youtube001" },
     playing: true,
     generation: 1,
+    trackGeneration: 1,
     volume: 70,
     spotifyConnected: true,
   };
@@ -18,7 +21,9 @@ async function player() {
     loadVideoById: vi.fn(),
     playVideo: vi.fn(),
     setVolume: vi.fn(),
-    getVideoData: () => ({ video_id: model.current.id }),
+    getVideoData: vi.fn(() => ({ video_id: model.current.id })),
+    getCurrentTime: vi.fn(() => 180),
+    getPlayerState: vi.fn(() => 1),
   };
   let youtubeEvents: any;
   const listeners: Record<string, (...args: any[]) => void> = {};
@@ -27,6 +32,7 @@ async function player() {
     setVolume: vi.fn(async () => {}),
     connect: vi.fn(async () => true),
     disconnect: vi.fn(),
+    getCurrentState: vi.fn(async (): Promise<any> => null),
     addListener: (name: string, fn: any) => {
       listeners[name] = fn;
     },
@@ -34,7 +40,7 @@ async function player() {
   const context: any = {
     URLSearchParams,
     Date,
-    setInterval: () => 1,
+    setInterval: (callback: () => void) => { sample = callback; return 1; },
     clearInterval: () => {},
     document: {
       querySelector: () => ({ textContent: "" }),
@@ -43,7 +49,14 @@ async function player() {
     location: { search: "?token=test", origin: "http://127.0.0.1:17843" },
     addEventListener: () => {},
     fetch: async (path: string, options: any) => {
-      if (path === "/player-event") events.push(JSON.parse(options.body));
+      if (path === "/player-event") {
+        const event = JSON.parse(options.body);
+        events.push(event);
+        if (event.event === "ended" && failedEndings > 0) {
+          failedEndings--;
+          throw Error("Temporary loopback failure");
+        }
+      }
       return { ok: true, status: 200, json: async () => model };
     },
     EventSource: class {
@@ -78,6 +91,8 @@ async function player() {
   return {
     yt,
     youtubeEvents,
+    sample,
+    failNextEnding: () => { failedEndings++; },
     sdk,
     listeners,
     events,
@@ -169,4 +184,109 @@ it("resumes without reloading, restarts repeated tracks, and surfaces autoplay b
   p.youtubeEvents.onAutoplayBlocked();
   await p.flush();
   expect(p.events).toContainEqual(expect.objectContaining({ event: "error", generation: 4, message: expect.stringContaining("autoplay was blocked") }));
+});
+
+it("recovers a missed YouTube end event and reports each rotation only once", async () => {
+  const p = await player();
+  p.sample();
+  p.yt.getPlayerState.mockReturnValue(0);
+  p.sample();
+  p.sample();
+  await p.flush();
+  expect(p.events.filter(e => e.event === "ended")).toHaveLength(1);
+  p.youtubeEvents.onStateChange({ data: 0 });
+  await p.flush();
+  expect(p.events.filter(e => e.event === "ended")).toEqual([
+    expect.objectContaining({ key: "youtube:youtube001", generation: 1 }),
+  ]);
+  // A one-track shuffled rotation must load and finish the same ID again.
+  await p.change({ current: { source: "youtube", id: "youtube001" }, playing: true,
+    generation: 2, trackGeneration: 2, volume: 70, spotifyConnected: true });
+  // The old ended state may linger until the iframe starts the new load.
+  p.sample();
+  expect(p.events.filter(e => e.event === "ended")).toHaveLength(1);
+  p.yt.getPlayerState.mockReturnValue(1);
+  p.sample();
+  p.yt.getPlayerState.mockReturnValue(0);
+  p.sample();
+  await p.flush();
+  expect(p.yt.loadVideoById).toHaveBeenCalledTimes(2);
+  expect(p.events.filter(e => e.event === "ended")).toHaveLength(2);
+});
+
+it("does not treat paused, buffering, cued or stale YouTube samples as endings", async () => {
+  const p = await player();
+  for (const value of [-1, 1, 2, 3, 5]) {
+    p.yt.getPlayerState.mockReturnValue(value);
+    p.sample();
+  }
+  p.yt.getPlayerState.mockReturnValue(0);
+  p.yt.getVideoData.mockReturnValue({ video_id: "oldvideo001" });
+  p.sample();
+  p.youtubeEvents.onStateChange({ data: 0 });
+  p.yt.getVideoData.mockReturnValue({ video_id: "youtube001" });
+  await p.change({ current: { source: "youtube", id: "youtube001" }, playing: false,
+    generation: 1, trackGeneration: 1, volume: 70, spotifyConnected: true });
+  p.sample();
+  p.youtubeEvents.onStateChange({ data: 0 });
+  await p.flush();
+  expect(p.events.filter(e => e.event === "ended")).toHaveLength(0);
+});
+
+it("advances YouTube through its normal end callback without waiting for a sample", async () => {
+  const p = await player();
+  p.youtubeEvents.onStateChange({ data: 1 });
+  p.youtubeEvents.onStateChange({ data: 0 });
+  p.youtubeEvents.onStateChange({ data: 0 });
+  await p.flush();
+  expect(p.events.filter(e => e.event === "ended")).toEqual([
+    expect.objectContaining({ key: "youtube:youtube001", generation: 1 }),
+  ]);
+});
+
+for (const source of ["youtube", "spotify"]) {
+  it(`retries a failed ${source} completion and stops after delivery`, async () => {
+    const p = await player();
+    p.failNextEnding();
+    if (source === "youtube") {
+      p.youtubeEvents.onStateChange({ data: 1 });
+      p.youtubeEvents.onStateChange({ data: 0 });
+    } else {
+      await p.change({ current: { source, id: "spotify001" }, playing: true,
+        generation: 2, trackGeneration: 2, volume: 70, spotifyConnected: true });
+      const sample = (paused: boolean, position: number) => ({ paused, position, duration: 10000,
+        track_window: { current_track: { id: "spotify001" } } });
+      p.listeners.player_state_changed(sample(false, 9900));
+      p.listeners.player_state_changed(sample(true, 0));
+      // Isolate the retry timer from further provider state observations.
+      p.sdk.getCurrentState = vi.fn(async () => null);
+    }
+    await p.flush();
+    expect(p.events.filter(e => e.event === "ended")).toHaveLength(1);
+    p.sample();
+    await p.flush();
+    expect(p.events.filter(e => e.event === "ended")).toHaveLength(2);
+    p.sample();
+    await p.flush();
+    expect(p.events.filter(e => e.event === "ended")).toHaveLength(2);
+  });
+}
+
+it("discards failed completions after playback changes", async () => {
+  const p = await player();
+  p.failNextEnding();
+  p.youtubeEvents.onStateChange({ data: 1 });
+  p.youtubeEvents.onStateChange({ data: 0 });
+  await p.flush();
+  await p.change({ current: { source: "youtube", id: "youtube002" }, playing: true,
+    generation: 2, trackGeneration: 2, volume: 70, spotifyConnected: true });
+  p.sample();
+  await p.flush();
+  expect(p.events.filter(e => e.event === "ended")).toHaveLength(1);
+  p.youtubeEvents.onStateChange({ data: 0 });
+  await p.flush();
+  expect(p.events.filter(e => e.event === "ended")).toHaveLength(2);
+  expect(p.events.filter(e => e.event === "ended")[1]).toMatchObject({
+    key: "youtube:youtube002", generation: 2,
+  });
 });
