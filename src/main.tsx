@@ -1115,13 +1115,6 @@ function App() {
                 >
                   Check for updates
                 </Button>
-                <p className="notice">
-                  Spotify playback, Windows packaging and DRM approval need
-                  real-account and Windows verification before release.
-                  Combining services and broadcasting require provider
-                  permission and appropriate rights. See the repository’s
-                  playback and release documentation.
-                </p>
               </section>
               <section className="section">
                 <h2>Diagnostics</h2>
