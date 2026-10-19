@@ -46,6 +46,16 @@ export class Playlists {
     this.state.baseShuffle = shuffled;
     this.state.activePlaylistId = id;
   }
+  setShuffle(enabled: boolean) {
+    if (enabled === this.state.baseShuffle) return;
+    if (enabled) shuffle(this.state.base);
+    else if (this.state.activePlaylistId) {
+      const remaining = new Map(this.state.base.map(track => [key(track), track]));
+      this.state.base = this.get(this.state.activePlaylistId).tracks
+        .flatMap(track => remaining.has(key(track)) ? [remaining.get(key(track))!] : []);
+    }
+    this.state.baseShuffle = enabled;
+  }
   stop() {
     this.state.activePlaylistId = null;
     this.state.base = [];
@@ -55,8 +65,18 @@ export class Playlists {
     const playlist = this.get(id);
     const checked = PlaylistSchema.shape.tracks.parse(tracks);
     const next = this.state.base[0];
+    const previousKeys = new Set(playlist.tracks.map(key));
+    const upcomingKeys = new Set(this.state.base.map(key));
     playlist.tracks = checked;
     if (this.state.activePlaylistId === id) {
+      if (!this.state.settings.repeatBase) {
+        const eligible = checked.filter(track => upcomingKeys.has(key(track)) || !previousKeys.has(key(track)));
+        const remaining = new Map(eligible.map(track => [key(track), track]));
+        const ordered = this.state.base.flatMap(track => remaining.has(key(track)) ? [remaining.get(key(track))!] : []);
+        const existing = new Set(ordered.map(key));
+        this.state.base = (this.state.baseShuffle ? [...ordered, ...shuffle(eligible.filter(track => !existing.has(key(track))))] : eligible).map(track => ({ ...track, user: "Auto" }));
+        return;
+      }
       if (this.state.baseShuffle) {
         const remaining = new Map(checked.map(track => [key(track), track]));
         const ordered: Track[] = [];

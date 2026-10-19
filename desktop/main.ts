@@ -82,6 +82,8 @@ function serial(task: () => Promise<void> | void, propagate = false) {
 function snapshot(): Snapshot {
   return {
     ...queue.state,
+    playbackGeneration: generation,
+    progress: playbackSample.generation === generation ? playbackSample : null,
     current: queue.current,
     playing: queue.playing,
     currentLane: queue.currentLane,
@@ -117,6 +119,7 @@ function publicState(presetId?: string) {
   };
 }
 function emit() {
+  placePlayer();
   if (main && !main.isDestroyed())
     main.webContents.send("encore:state", snapshot());
   for (const client of clients) client.write("data: update\n\n");
@@ -205,7 +208,11 @@ function windowSecurity(win: BrowserWindow, allowed: string) {
 function placePlayer() {
   if (main && player) {
     const [width] = main.getContentSize();
-    player.setBounds({ x: width - 344, y: 112, width: 320, height: 240 });
+    const panel = width <= 1100 ? 280 : 376;
+    const inset = width <= 1100 ? 16 : 24;
+    const size = panel - 10 - inset * 2 - 2;
+    player.setVisible(queue.current?.source === "youtube");
+    player.setBounds({ x: width - panel + inset + 1, y: 84, width: size, height: size });
   }
 }
 function showPlayer() {
@@ -420,6 +427,16 @@ async function command(c: Command) {
   error = "";
   const playlists = new Playlists(queue.state);
   switch (c.type) {
+    case "playlistShuffle": playlists.setShuffle(c.enabled); break;
+    case "seek": {
+      if (!queue.current || key(queue.current) !== c.key || c.generation !== generation)
+        throw Error("The current track changed. Try seeking again.");
+      if (!player || c.position > queue.current.duration) throw Error("Playback is not ready to seek.");
+      const ok = await player.webContents.executeJavaScript(`window.encoreSeek(${JSON.stringify(c.key)}, ${c.generation}, ${c.position})`);
+      if (!ok) throw Error("The browser player is not ready to seek.");
+      playbackSample = { generation, position: c.position, observedAt: Date.now(), active: queue.playing };
+      break;
+    }
     case "playlistCreate": playlists.create(c.id, c.name); break;
     case "playlistReorder": playlists.reorder(c.id, c.to); break;
     case "playlistRename": playlists.rename(c.id, c.name); break;
@@ -446,6 +463,7 @@ async function command(c: Command) {
         spotifyStatus = "Disconnected";
         providers.disconnect();
       }
+      queue.setRepeatBase(next.repeatBase);
       queue.state.settings = next;
       providers.clientId = next.clientId;
       if (next.launchAtLogin !== old.launchAtLogin) {
@@ -728,6 +746,7 @@ const server = createServer(async (req, res) => {
       if (data.event === "progress") {
         if (queue.current && data.key === key(queue.current) && data.generation === generation && data.position !== undefined) {
           playbackSample = { generation, position: data.position, observedAt: Date.now(), active: queue.playing && !!data.active };
+          if (main && !main.isDestroyed()) main.webContents.send("encore:state", snapshot());
         }
       } else if (data.event === "ready" && data.device) {
         spotifyDevice = data.device;

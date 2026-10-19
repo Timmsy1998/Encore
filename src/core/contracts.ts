@@ -45,6 +45,7 @@ export const SettingsSchema = z.object({
     .regex(/^([a-f0-9]{32})?$/)
     .default(""),
   requests: z.boolean().default(true),
+  repeatBase: z.boolean().default(true),
   volume: z.number().int().min(0).max(100).default(70),
   userLimit: z.number().int().min(1).max(1000).default(5),
   globalLimit: z.number().int().min(1).max(10000).default(100),
@@ -122,8 +123,12 @@ export type Snapshot = SavedState & {
   importStatus: string;
   updateStatus?: string;
   updateReady?: boolean;
+  playbackGeneration?: number;
+  progress?: { position: number; observedAt: number; active: boolean } | null;
 };
 export const CommandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("seek"), key: z.string().max(100), generation: z.number().int().nonnegative(), position: z.number().min(0).max(86400) }),
+  z.object({ type: z.literal("playlistShuffle"), enabled: z.boolean() }),
   z.object({ type: z.literal("playlistCreate"), id: z.uuid(), name: z.string().trim().min(1).max(80) }),
   z.object({ type: z.literal("playlistReorder"), id: z.uuid(), to: z.number().int().nonnegative() }),
   z.object({ type: z.literal("playlistRename"), id: z.uuid(), name: z.string().trim().min(1).max(80) }),

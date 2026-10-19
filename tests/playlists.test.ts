@@ -132,3 +132,45 @@ describe("saved mixed playlists", () => {
     expect(() => migrate({ ...state, activePlaylistId: otherId })).toThrow();
   });
 });
+
+it("toggles shuffle on remaining base tracks without changing current music, requests, or the saved library", () => {
+  vi.spyOn(Math, "random").mockReturnValue(0);
+  try {
+    const q = new Queue(); const library = new Playlists(q.state);
+    library.create(id, "Mix"); library.append(id, [spotify, youtube]); library.activate(id);
+    q.add({ ...youtube, id: "request0001" }); q.next(); q.playing = true;
+    q.listen({ ...youtube, id: "personal001" });
+    library.setShuffle(true);
+    expect(q.state.base.map(key)).toEqual([key(youtube), key(spotify)]);
+    expect(q.current?.id).toBe("request0001"); expect(q.playing).toBe(true);
+    library.setShuffle(false);
+    expect(q.state.base.map(key)).toEqual([key(spotify), key(youtube)]);
+    expect(q.next()?.id).toBe("personal001");
+    expect(library.get(id).tracks.map(key)).toEqual([key(spotify), key(youtube)]);
+  } finally { vi.restoreAllMocks(); }
+});
+
+it("can finish the stream playlist once while requests and personal listening are never repeated", () => {
+  const q = new Queue(); const library = new Playlists(q.state);
+  library.create(id, "Mix"); library.append(id, [spotify, youtube]); library.activate(id);
+  q.state.settings.repeatBase = false;
+  q.add({ ...youtube, id: "request0001" }); q.listen({ ...youtube, id: "personal001" });
+  expect([q.next(), q.next(), q.next(), q.next()].map(t => t?.id)).toEqual(["request0001", "personal001", spotify.id, youtube.id]);
+  expect(q.next()).toBeNull();
+  expect(library.get(id).tracks).toHaveLength(2);
+  expect(defaults().settings.repeatBase).toBe(true);
+});
+
+it("changes repeat during a base track and restores interrupted single-pass playback paused", () => {
+  const q = new Queue(); const library = new Playlists(q.state);
+  library.create(id, "Mix"); library.append(id, [spotify, youtube]); library.activate(id);
+  q.next(); q.setRepeatBase(false);
+  expect(q.state.base.map(key)).toEqual([key(youtube)]);
+  library.move(id, 0, 1);
+  expect(q.state.base.map(key)).toEqual([key(youtube)]);
+  const restored = new Queue(migrate(JSON.parse(JSON.stringify(q.persisted()))));
+  expect(restored.playing).toBe(false);
+  expect(restored.next()?.id).toBe(spotify.id);
+  q.setRepeatBase(true);
+  expect(q.state.base.map(key)).toEqual([key(youtube), key(spotify)]);
+});

@@ -15,10 +15,6 @@ import {
   History,
   Settings2,
   Radio,
-  Play,
-  Pause,
-  SkipForward,
-  Volume2,
   Plus,
   ArrowUp,
   ArrowDown,
@@ -29,11 +25,15 @@ import {
   Check,
   ChevronRight,
   Music2,
-  SlidersHorizontal,
+  MoreVertical,
+  GripVertical,
+  Search,
+  Monitor,
   CircleHelp,
 } from "lucide-react";
 import * as Switch from "@radix-ui/react-switch";
 import { Button } from "./components/ui/button";
+import { Playback, Cover, Provider, Timeline, artwork, time } from "./Playback";
 import { PlaylistLibrary } from "./PlaylistLibrary";
 import {
   key,
@@ -66,13 +66,6 @@ const pages = [
   "About",
 ] as const;
 type Page = (typeof pages)[number];
-function artwork(track: Track) {
-  return track.source === "youtube"
-    ? `https://i.ytimg.com/vi/${track.id}/default.jpg`
-    : track.coverId
-      ? `https://i.scdn.co/image/${track.coverId}`
-      : undefined;
-}
 const icons = [
   ListMusic,
   Music2,
@@ -94,8 +87,6 @@ const steps = [
   "OBS overlay",
   "Ready to listen",
 ];
-const time = (n: number) =>
-  `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, "0")}`;
 function Toggle({
   checked,
   onChange,
@@ -149,6 +140,15 @@ function App() {
     [importingPlaylist, setImportingPlaylist] = useState(false),
     [playlistResult, setPlaylistResult] = useState(""),
     [drag, setDrag] = useState<number>();
+  const [queueFilter, setQueueFilter] = useState("All");
+  const [rowMenu, setRowMenu] = useState<string | null>(null);
+  useEffect(() => {
+    const close = (e: Event) => { if (e instanceof KeyboardEvent) { if (e.key === "Escape") setRowMenu(null); return; } if (!(e.target instanceof Element) || !e.target.closest(".row-menu")) setRowMenu(null); };
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", close);
+    return () => { document.removeEventListener("click", close); document.removeEventListener("keydown", close); };
+  }, []);
+  useEffect(() => setRowMenu(null), [page, search, queueFilter]);
   const [selectedOverlay, setSelectedOverlay] = useState("");
   const [draft, setDraft] = useState<Partial<Settings>>({});
   useEffect(() => {
@@ -514,7 +514,7 @@ function App() {
                 setDrag(undefined);
               }}
             >
-              <span className="position">{String(i + 1).padStart(2, "0")}</span>
+              <GripVertical className="drag-handle" size={18} aria-hidden="true" /><span className="position">{String(i + 1).padStart(2, "0")}</span>
               {artwork(t) ? (
                 <img className="art" src={artwork(t)} alt="" loading="lazy" />
               ) : (
@@ -525,14 +525,18 @@ function App() {
               <div className="track-info">
                 <strong>{t.title}</strong>
                 <span>
-                  {t.author} <b>·</b> {kind === "request" ? `Requested by ${t.user}` : kind === "base" ? "Stream playlist" : t.user}
+                  {t.author}
                 </span>
               </div>
-              <span className={`source ${t.source}`}>
-                {t.source === "youtube" ? "YT" : "SP"}
+              <span className="track-requester" title={kind === "request" ? `Requested by ${t.user}` : kind === "base" ? "Stream playlist" : "Personal listening"}>
+                <span className="requester-avatar" aria-hidden="true">{kind === "base" ? <ListMusic size={15} /> : t.user.slice(0, 1).toUpperCase()}</span>
+                {kind === "request" ? `Requested by ${t.user}` : kind === "base" ? "Base playlist" : "Personal listening"}
               </span>
+              <Provider source={t.source} />
               <span className="duration">{time(t.duration)}</span>
-              <div className="row-actions">
+              <div className="row-menu">
+                <Button variant="ghost" size="icon" aria-label={`Actions for ${t.title}`} aria-expanded={rowMenu === `${kind}-${i}`} onClick={() => setRowMenu(rowMenu === `${kind}-${i}` ? null : `${kind}-${i}`)}><MoreVertical size={20} /></Button>
+                {rowMenu === `${kind}-${i}` && <div className="row-actions" onClick={() => setRowMenu(null)}>
                 {kind === "request" && (
                   <>
                     <Button
@@ -611,6 +615,7 @@ function App() {
                 >
                   <Ban size={14} />
                 </Button>
+                </div>}
               </div>
             </div>
           ))
@@ -642,14 +647,13 @@ function App() {
           <AudioLines />
           <span>encore</span>
         </a>
-        <span className="nav-label">PLAYER</span>
-        <nav>
+        <nav aria-label="Main navigation">
           {pages.map((p, i) => {
             const Icon = icons[i];
             return (
               <button
                 key={p}
-                className={page === p ? "active" : ""}
+                className={`${page === p ? "active" : ""} ${p === "Settings" ? "nav-settings" : ""}`}
                 onClick={() => {
                   setPage(p);
                   setSearch("");
@@ -659,7 +663,7 @@ function App() {
                 aria-current={page === p ? "page" : undefined}
               >
                 <Icon size={18} />
-                <span>{p === "Queue" ? "Queue / Up Next" : p}</span>
+                <span>{p === "Queue" ? "Queue / Up Next" : p === "About" ? "Help & about" : p}</span>
                 {p === "Queue" && s.queue.length > 0 && (
                   <em>{s.queue.length}</em>
                 )}
@@ -679,18 +683,9 @@ function App() {
           <small>ENCORE {s.appVersion}</small>
         </div>
       </aside>
-      <header className="topbar">
-        <span className="breadcrumb">
-          Your music, in good company <span>/ {page === "Queue" ? "Queue / Up Next" : page}</span>
-        </span>
-        <Toggle
-          label="Accept requests"
-          checked={s.settings.requests}
-          onChange={(v) => config({ requests: v })}
-        />
-      </header>
       <main className="workspace">
         <div className="content">
+          <div className="requests-control"><Toggle label="Accept requests" checked={s.settings.requests} onChange={v => config({ requests: v })} /></div>
           {(s.error || localError) && (
             <div className="alert" role="alert">
               {localError || s.error}
@@ -714,7 +709,7 @@ function App() {
                   <h1>{page === "Queue" ? "Queue / Up Next" : page}</h1>
                   <p>
                     {page === "Queue"
-                      ? "Requests first, then your listening queue, then the stream playlist. The current song finishes first."
+                      ? "Your music, in good company"
                       : page === "Listening"
                         ? "Music for you, with or without Streamer.bot."
                         : page === "Favourites"
@@ -733,42 +728,29 @@ function App() {
                   tracks
                 </span>
               </div>
-              {page === "Queue" && <section className="queue-current" aria-label="Current track">
-                <span className="eyebrow">{s.current ? (s.playing ? "NOW PLAYING" : "PAUSED") : "READY WHEN YOU ARE"}</span>
-                {s.current ? <>
-                  <h2>{s.current.title}</h2>
-                  <p>{s.current.author} · {s.currentLane === "request" ? `Requested by ${s.current.user}` : s.currentLane === "base" ? "Stream playlist" : "Personal listening"}</p>
-                </> : <p>No current track. Add music, then press Play.</p>}
-              </section>}
               {["Queue", "Listening"].includes(page) && (
                 <form className="add-track" onSubmit={add}>
-                  <Plus size={18} />
+                  <Search size={21} />
                   <input
                     aria-label={
                       page === "Queue" ? "Request track" : "Add listening track"
                     }
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="YouTube / Spotify link, or search YouTube…"
+                    placeholder="Find a song or paste a link"
                   />
                   <Button disabled={busy || !input.trim()} type="submit">
-                    {page === "Queue" ? "Add request" : "Add music"}
+                    <Plus size={19} />{page === "Queue" ? "Add song" : "Add music"}
                   </Button>
                 </form>
               )}
               <div className="list-toolbar">
-                <span>
-                  {page === "Queue" ? "PRIORITY REQUESTS" : page.toUpperCase()}
-                </span>
-                <input
-                  type="search"
-                  aria-label="Filter tracks"
-                  placeholder="Filter tracks"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
+                {page === "Queue" ? <div className="queue-filters" role="group" aria-label="Queue filters">{["All", "Requests", "Listening", "Playlist"].map(filter => <button key={filter} aria-label={`Show ${filter.toLowerCase()} tracks`} aria-pressed={queueFilter === filter} onClick={() => setQueueFilter(filter)}>{filter}</button>)}</div> : <span>{page.toUpperCase()}</span>}
+                <input type="search" aria-label="Filter tracks" placeholder="Filter tracks" value={search} onChange={e => setSearch(e.target.value)} />
               </div>
-              {rows(
+              {page === "Queue" && <div className="queue-summary"><span>{s.queue.length + s.listening.length + upcomingBase.length} tracks · {time([...s.queue, ...s.listening, ...upcomingBase].reduce((n, t) => n + t.duration, 0))}</span><small>Requests first · current song finishes before the next request</small></div>}
+              <div className="track-columns" aria-hidden="true"><span>#</span><span>Track</span><span>Requested by</span><span>Source</span><span>Duration</span><span /></div>
+              {(page !== "Queue" || queueFilter === "All" || queueFilter === "Requests") && rows(
                 page === "Queue"
                   ? s.queue
                   : page === "Listening"
@@ -783,15 +765,15 @@ function App() {
                     : "saved",
               )}
               {page === "Queue" && <>
-                <section className="section queue-lane" aria-label="Personal listening up next">
-                  <h2>Then · Personal listening <span className="count">{s.listening.length} tracks</span></h2>
+                {(queueFilter === "All" || queueFilter === "Listening") && <section className="section queue-lane" aria-label="Personal listening up next">
+                  <h2>Personal listening <span className="count">{s.listening.length} tracks</span></h2>
                   {rows(s.listening, "listening")}
-                </section>
-                <section className="section queue-lane" aria-label="Stream playlist up next">
-                  <h2>Then · Stream playlist</h2>
-                  <p>{s.playlists.find(item => item.id === s.activePlaylistId)?.name ?? "Background rotation"} · {upcomingBase.length} available tracks{s.baseShuffle ? " · Shuffled" : ""}. Showing up to five next in the rotation; new requests take priority.</p>
-                  {upcomingBase.length ? rows(upcomingBase.slice(0, 5), "base") : <p>No available stream tracks. Choose a playlist or review bans on the Playlists and Settings pages.</p>}
-                </section>
+                </section>}
+                {(queueFilter === "All" || queueFilter === "Playlist") && <section className="section queue-lane" aria-label="Stream playlist up next">
+                  <h2>Stream playlist</h2>
+                  <p>{s.playlists.find(item => item.id === s.activePlaylistId)?.name ?? "Background rotation"} · {upcomingBase.length} available tracks{s.baseShuffle ? " · Shuffled" : ""}. New requests take priority.</p>
+                  {upcomingBase.length ? rows(upcomingBase, "base") : <p>No available stream tracks. Choose a playlist or review bans on the Playlists and Settings pages.</p>}
+                </section>}
               </>}
             </>
           )}
@@ -1162,32 +1144,18 @@ function App() {
             </>
           )}
         </div>
-        <aside className="now-panel">
-          <span className="eyebrow">THE PLAYER</span>
-          <div
-            className="provider-space"
-            aria-label="Provider browser playback area"
-          />
-          <div className="now-info">
-            <span className="source-label">
-              {s.current
-                ? s.current.source.toUpperCase()
-                : "READY WHEN YOU ARE"}
-            </span>
+        <aside className="now-panel" aria-label="Now playing">
+          <h2 className="panel-heading">Now playing</h2>
+          <div className={`provider-space ${s.current?.source === "youtube" ? "youtube-space" : ""}`} aria-label="Provider browser playback area"><Cover track={s.current} className="now-art" />{!s.current && <span>Your soundtrack starts here</span>}</div>
+          <div className="now-details">
+          <section className="now-info" aria-label="Current track">
             <h2>{s.current?.title || "Find your next favourite"}</h2>
-            <p>
-              {s.current?.author || "Add music to either queue and press Play."}
-            </p>
-            {s.current && (
-              <span className="requester">
-                {s.currentLane === "request"
-                  ? "Requested by " + s.current.user
-                  : s.currentLane === "listening"
-                    ? "Personal listening"
-                    : "From your base playlist"}
-              </span>
-            )}
-          </div>
+            <p>{s.current?.author || "Add music to either queue and press Play."}</p>
+            {s.current && <div className="now-source"><Provider source={s.current.source} /><span>·</span><span className="requester">{s.currentLane === "request" ? "Requested by " + s.current.user : s.currentLane === "listening" ? "Personal listening" : "From your base playlist"}</span></div>}
+            <Timeline state={s} send={send} disabled={busy} compact />
+          </section>
+          <section className="up-next" aria-label="Next track preview"><h3>Up next</h3>{(() => { const next = s.queue[0] ?? s.listening[0] ?? upcomingBase[0]; return next ? <div className="next-track"><Cover track={next} /><div><strong>{next.title}</strong><span>{next.author}</span><small><Provider source={next.source} /> · {s.queue.length ? `Requested by ${next.user}` : s.listening.length ? "Personal listening" : "Base playlist"}</small></div><span>{time(next.duration)}</span></div> : <p>Add a song to keep the music going.</p>; })()}</section>
+          <Button className="view-overlay" variant="secondary" onClick={() => send({ type: "overlayTest" })}><Monitor size={20} /> View overlay <ExternalLink size={15} /></Button>
           <div className="connection-list">
             <div>
               <span
@@ -1208,64 +1176,10 @@ function App() {
               Spotify<small>{s.spotify}</small>
             </div>
           </div>
-          <div className="tip">
-            <SlidersHorizontal size={17} />
-            <p>
-              Requests first. Your music next.
-              <br />
-              One set of playback controls.
-            </p>
           </div>
         </aside>
       </main>
-      <footer className="playback">
-        <div className="playback-title">
-          {s.current && artwork(s.current) ? (
-            <img className="art" src={artwork(s.current)} alt="" />
-          ) : (
-            <AudioLines size={23} />
-          )}
-          <div>
-            <strong>{s.current?.title || "Nothing playing"}</strong>
-            <small>
-              {s.current
-                ? (s.playing ? "Playing" : "Paused") + " · " + s.current.source
-                : "Your next track is waiting"}
-            </small>
-          </div>
-        </div>
-        <div className="transport">
-          <Button
-            aria-label={s.playing ? "Pause" : "Play"}
-            disabled={busy}
-            size="icon"
-            onClick={() => send({ type: s.playing ? "pause" : "play" })}
-          >
-            {s.playing ? <Pause size={21} /> : <Play size={21} />}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Skip track"
-            disabled={busy}
-            onClick={() => send({ type: "skip" })}
-          >
-            <SkipForward size={22} />
-          </Button>
-        </div>
-        <div className="volume">
-          <Volume2 size={17} />
-          <input
-            aria-label="Volume"
-            type="range"
-            min="0"
-            max="100"
-            value={s.settings.volume}
-            onChange={(e) => config({ volume: Number(e.target.value) })}
-          />
-          <span>{s.settings.volume}%</span>
-        </div>
-      </footer>
+      <Playback state={s} send={send} busy={busy} showQueue={() => setPage("Queue")} />
     </div>
   );
 }

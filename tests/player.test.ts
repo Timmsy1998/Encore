@@ -21,6 +21,7 @@ async function player() {
     loadVideoById: vi.fn(),
     playVideo: vi.fn(),
     setVolume: vi.fn(),
+    seekTo: vi.fn(),
     getVideoData: vi.fn(() => ({ video_id: model.current.id })),
     getCurrentTime: vi.fn(() => 180),
     getPlayerState: vi.fn(() => 1),
@@ -29,6 +30,7 @@ async function player() {
   const listeners: Record<string, (...args: any[]) => void> = {};
   const sdk = {
     pause: vi.fn(async () => {}),
+    seek: vi.fn(async () => {}),
     setVolume: vi.fn(async () => {}),
     connect: vi.fn(async () => true),
     disconnect: vi.fn(),
@@ -91,6 +93,7 @@ async function player() {
   };
   await flush();
   return {
+    seek: (key: string, generation: number, position: number) => context.encoreSeek(key, generation, position),
     reconnect: () => context.encoreReconnectSpotify(),
     yt,
     youtubeEvents,
@@ -328,4 +331,28 @@ it("bounds Spotify reconnection and allows another attempt after timeout", async
   } finally {
     vi.useRealTimers();
   }
+});
+
+
+it("seeks only the matching provider track and generation and rejects invalid positions", async () => {
+  const p = await player();
+  await p.change({ current: { source: "youtube", id: "youtube001", duration: 180 }, generation: 2, trackGeneration: 1, playing: true, volume: 70, spotifyConnected: true });
+  expect(await p.seek("youtube:youtube001", 1, 30)).toBe(false);
+  expect(await p.seek("youtube:different1", 2, 30)).toBe(false);
+  expect(await p.seek("youtube:youtube001", 2, -1)).toBe(false);
+  expect(await p.seek("youtube:youtube001", 2, 181)).toBe(false);
+  expect(await p.seek("youtube:youtube001", 2, NaN)).toBe(false);
+  expect(p.yt.seekTo).not.toHaveBeenCalled();
+  expect(await p.seek("youtube:youtube001", 2, 30)).toBe(true);
+  expect(p.yt.seekTo).toHaveBeenCalledExactlyOnceWith(30, true);
+  await p.change({ current: { source: "spotify", id: "spotify001", duration: 180 }, generation: 3, playing: true, volume: 70, spotifyConnected: true });
+  await p.listeners.ready({ device_id: "encore-device" });
+  expect(await p.seek("youtube:youtube001", 2, 30)).toBe(false);
+  p.sdk.getCurrentState.mockResolvedValue({ track_window: { current_track: { id: "different" } } });
+  expect(await p.seek("spotify:spotify001", 3, 42)).toBe(false);
+  p.sdk.getCurrentState.mockResolvedValue({ track_window: { current_track: { id: "spotify001" } } });
+  expect(await p.seek("spotify:spotify001", 3, 42)).toBe(true);
+  expect(p.sdk.seek).toHaveBeenCalledExactlyOnceWith(42000);
+  p.listeners.not_ready({ device_id: "encore-device" });
+  expect(await p.seek("spotify:spotify001", 3, 42)).toBe(false);
 });

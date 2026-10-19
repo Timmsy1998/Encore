@@ -7,8 +7,9 @@ body {
 }
 #video,
 #spotify {
-  width: 320px;
-  height: 200px;
+  width: 100%;
+  height: calc(100vh - 40px);
+  min-height: 200px;
 }
 #player {
   width: 100%;

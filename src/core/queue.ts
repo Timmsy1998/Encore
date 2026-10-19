@@ -10,8 +10,8 @@ export class Queue {
     this.state = state;
     if (state.resume) {
       const { track, lane } = state.resume;
-      if (lane !== "base") {
-        const target = lane === "request" ? state.queue : state.listening;
+      if (lane !== "base" || !state.settings.repeatBase) {
+        const target = lane === "base" ? state.base : lane === "request" ? state.queue : state.listening;
         if (!target.some((t) => key(t) === key(track))) target.unshift(track);
       }
       state.resume = null;
@@ -70,6 +70,14 @@ export class Queue {
     ].slice(0, 1000);
     return true;
   }
+  setRepeatBase(enabled: boolean) {
+    if (enabled === this.state.settings.repeatBase) return;
+    if (this.current && this.currentLane === "base") {
+      this.state.base = this.state.base.filter(t => key(t) !== key(this.current!));
+      if (enabled) this.state.base.push(this.current);
+    }
+    this.state.settings.repeatBase = enabled;
+  }
   next() {
     this.votes.clear();
     this.playing = false;
@@ -87,7 +95,7 @@ export class Queue {
       );
       if (i >= 0) {
         this.current = this.state.base.splice(i, 1)[0];
-        this.state.base.push(this.current);
+        if (this.state.settings.repeatBase) this.state.base.push(this.current);
       }
     }
     return this.current;

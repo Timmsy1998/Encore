@@ -11,6 +11,7 @@ let state = null,
   ytPlayingKey = "",
   intent = -1,
   spotifyActive = false;
+let spotifyDeviceReady = false;
 let spotifyPrevious = null,
   observationTime = 0,
   endedGeneration = -1,
@@ -69,6 +70,25 @@ function observeYouTube(playbackState) {
   // A newly loaded rotation can still expose the previous video's ended state.
   if (playbackState === 0 && ytPlayingKey === ytKey) ended();
 }
+window.encoreSeek = async (expectedKey, expectedGeneration, position) => {
+  if (!state?.current || state.generation !== expectedGeneration ||
+      state.current.source + ":" + state.current.id !== expectedKey ||
+      !Number.isFinite(position) || position < 0 || position > state.current.duration) return false;
+  if (state.current.source === "youtube") {
+    if (!ytReady || yt.getVideoData().video_id !== state.current.id) return false;
+    yt.seekTo(position, true);
+  } else {
+    if (!sdkReady || !spotify || !spotifyDeviceReady) return false;
+    const instance = spotify;
+    const sample = await instance.getCurrentState();
+    if (spotify !== instance || !spotifyDeviceReady || state.generation !== expectedGeneration ||
+        state.current?.source + ":" + state.current?.id !== expectedKey ||
+        sample?.track_window?.current_track?.id !== state.current.id) return false;
+    await instance.seek(Math.round(position * 1000));
+    spotifyPrevious = null;
+  }
+  return true;
+};
 window.encorePause = async () => {
   intent = -1;
   if (ytReady) yt.pauseVideo();
@@ -170,10 +190,11 @@ async function connectSpotify() {
     if (spotify !== instance) return;
     status.textContent = "Spotify browser player ready";
     const delivered = await report("ready", { device: device_id });
-    if (spotify === instance && delivered !== false) readyWaiter?.();
+    if (spotify === instance && delivered !== false) { spotifyDeviceReady = true; readyWaiter?.(); }
   });
   spotify.addListener("not_ready", () => {
     if (spotify !== instance) return;
+    spotifyDeviceReady = false;
     void report("not_ready", {
       message: "Spotify browser player offline. Reconnect in Setup.",
     });
@@ -221,6 +242,7 @@ window.encoreReconnectSpotify = () => {
     spotify = null;
     previous?.disconnect();
     spotifyActive = false;
+    spotifyDeviceReady = false;
     spotifyPrevious = null;
     status.textContent = "Reconnecting Spotify browser player…";
     let timeout;
@@ -259,6 +281,7 @@ async function update() {
       spotify.disconnect();
       spotify = null;
       spotifyActive = false;
+      spotifyDeviceReady = false;
       spotifyPrevious = null;
     }
     const track = state.current;

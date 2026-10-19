@@ -36,7 +36,7 @@ Imports read up to 1,000 entries and skip unavailable or unsupported items. Fail
 
 ## Mixed playlists
 
-Open **Listening → Your playlists** to create a named playlist. Add songs from either service or use **Append playlist** to combine imports. Duplicate provider IDs are skipped.
+Open **Playlists** to create a named playlist. Add songs from either service or use **Append playlist** to combine imports. Duplicate provider IDs are skipped.
 
 Choose **Use for stream** to play it whenever requests and personal listening are empty. Reordering, switching, stopping or deleting a stream playlist affects upcoming tracks; the current song finishes normally. The library supports up to 100 playlists with 10,000 songs each and is included in backups.
 
@@ -62,3 +62,13 @@ If Canvas can't load, the overlay falls back to cover art. Reload the OBS Browse
 - YouTube: [IFrame API](https://developers.google.com/youtube/iframe_api_reference), [required player functionality](https://developers.google.com/youtube/terms/required-minimum-functionality).
 
 Spotify's [Developer Policy](https://developer.spotify.com/policy) restricts cross-service integration and broadcasting. Working playback doesn't grant provider approval or music rights. Encore uses the official players and doesn't download or extract audio streams.
+
+## Desktop playback workspace
+
+The queue has All, Requests, Listening and Playlist filters, text search, requester details and per-track action menus. Request rows support drag handles and keyboard move buttons. The persistent Now playing panel previews the next eligible track in request → personal listening → stream playlist order. Provider connection and recovery status remain visible in that panel.
+
+The bottom transport provides play/pause, restart track, skip, favourite, volume/mute and seeking. Progress comes from the active provider player; seeking stays disabled until a matching playback sample arrives. Main checks the track and playback generation before a seek, so a stale slider cannot seek the next song.
+
+Shuffle changes the upcoming stream playlist copy without changing saved songs or the current track. Turning it off restores saved order for a named playlist; direct URL imports retain their current order. Repeat is enabled by default. Turning it off removes the current base track from the rotation and lets remaining songs finish once. Requests and personal listening are never repeated. Reopening remains paused and restores an interrupted single-pass track.
+
+The redesigned workspace is checked in browser fixtures at 1440 × 900, 900 × 700 and 760 × 600. Real-account Spotify DRM playback and native YouTube placement on Windows still require Windows/account verification.

@@ -178,7 +178,7 @@ test("playlist imports show progress, completion and failure without losing save
   await expect(page.getByRole("alert")).toContainText("Playlist unavailable");
   await expect(page.getByText("your saved playlist is unchanged", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Queue / Up Next", exact: true }).click();
-  await expect(page.getByText("Imported fixture", { exact: true })).toBeVisible();
+  await expect(page.locator(".track-info").getByText("Imported fixture", { exact: true })).toBeVisible();
 });
 
 test("overlay customisation persists and matches the OBS renderer", async ({ page }) => {
@@ -442,13 +442,13 @@ test("up next shows current music, requester text and all playback lanes without
   });
   await page.reload();
   await expect(page.getByRole("region", { name: "Current track", exact: true })).toContainText("Requested by First viewer");
-  await expect(page.getByText("Requested by <b>Viewer</b>", { exact: false })).toBeVisible();
+  await expect(page.locator(".track-requester").filter({ hasText: "Requested by <b>Viewer</b>" })).toBeVisible();
   await expect(page.locator(".track-info b").filter({ hasText: "Viewer" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Personal listening up next", exact: true })).toContainText("Personal song");
   await expect(page.getByRole("region", { name: "Stream playlist up next", exact: true })).toContainText("Rotation song");
   await expect(page.getByText("Banned rotation song", { exact: true })).toHaveCount(0);
   await page.getByRole("searchbox", { name: "Filter tracks" }).fill("Viewer");
-  await expect(page.getByText("Requested song", { exact: true })).toBeVisible();
+  await expect(page.locator(".track-info").getByText("Requested song", { exact: true })).toBeVisible();
   await expect(page.getByText("Personal song", { exact: true })).toHaveCount(0);
   await page.getByRole("searchbox", { name: "Filter tracks" }).fill("");
   await page.screenshot({ path: `test-results/up-next-${testInfo.project.name}.png` });
@@ -456,4 +456,35 @@ test("up next shows current music, requester text and all playback lanes without
   expect(await page.evaluate(() => localStorage.getItem("fixture-commands"))).toBeNull();
   await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
   expect(await page.locator(".content").evaluate(e => e.scrollWidth <= e.clientWidth + 1)).toBe(true);
+});
+
+test("queue filters, action menus and transport send explicit playback commands", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(async () => {
+    const state = await window.encore.snapshot();
+    const track = { id: "abcdefghijk", source: "youtube" as const, title: "Live song", author: "Artist", duration: 180, user: "Viewer" };
+    Object.assign(state, { current: track, playing: false, playbackGeneration: 7, progress: { position: 30, observedAt: Date.now(), active: false }, queue: [{ ...track, id: "request0001", title: "Viewer request" }], base: [{ ...track, id: "base0000001", title: "Base song" }] });
+    localStorage.setItem("fixture-state", JSON.stringify(state));
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Show requests tracks" }).click();
+  await expect(page.getByRole("region", { name: "Stream playlist up next", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Actions for Viewer request" }).click();
+  await expect(page.getByRole("button", { name: "Move Viewer request up", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Move Viewer request up", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Shuffle stream playlist" }).click();
+  await page.getByRole("button", { name: "Repeat stream playlist" }).click();
+  await page.getByRole("button", { name: "Restart track" }).click();
+  const slider = page.getByRole("slider", { name: "Playback position", exact: true });
+  await slider.focus(); await slider.press("ArrowRight");
+  await page.getByRole("button", { name: "Mute", exact: true }).click();
+  await page.getByRole("button", { name: "Unmute", exact: true }).click();
+  const commands = await page.evaluate(() => JSON.parse(localStorage.getItem("fixture-commands") || "[]"));
+  expect(commands).toEqual(expect.arrayContaining([
+    { type: "playlistShuffle", enabled: true }, { type: "settings", settings: { repeatBase: false } },
+    { type: "seek", key: "youtube:abcdefghijk", generation: 7, position: 0 },
+    { type: "seek", key: "youtube:abcdefghijk", generation: 7, position: 31 },
+    { type: "settings", settings: { volume: 0 } }, { type: "settings", settings: { volume: 70 } },
+  ]));
 });
