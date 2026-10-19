@@ -16,6 +16,8 @@ For a Development Mode app, add your Spotify account under **User Management** i
 
 Encore creates its own playback device. Wait for **Browser player ready** before playing a song. If login succeeds but playback doesn't start, check Premium, app access and the browser-player error shown in Encore.
 
+If a previously working Spotify device goes offline, pressing Play recreates Encore's SDK device. A playback 404 also triggers one reconnect and retry automatically, with a 15-second readiness timeout. Encore never falls back to another Spotify device. Failed recovery leaves playback paused; check Setup and retry Play. The dedicated playback view stays unthrottled in the background. These paths are covered with controlled SDK tests; prolonged Windows playback with a real Premium account still needs verification.
+
 Windows packages use Castlabs Electron for Widevine support and need VMP signing. See [release setup](RELEASE.md#signing).
 
 ## Search and imports

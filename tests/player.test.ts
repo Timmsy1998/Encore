@@ -39,6 +39,8 @@ async function player() {
   };
   const context: any = {
     URLSearchParams,
+    setTimeout,
+    clearTimeout,
     Date,
     setInterval: (callback: () => void) => { sample = callback; return 1; },
     clearInterval: () => {},
@@ -75,7 +77,7 @@ async function player() {
     },
     Spotify: {
       Player: function () {
-        return sdk;
+        return { ...sdk };
       },
     },
   };
@@ -89,6 +91,7 @@ async function player() {
   };
   await flush();
   return {
+    reconnect: () => context.encoreReconnectSpotify(),
     yt,
     youtubeEvents,
     sample,
@@ -289,4 +292,40 @@ it("discards failed completions after playback changes", async () => {
   expect(p.events.filter(e => e.event === "ended")[1]).toMatchObject({
     key: "youtube:youtube002", generation: 2,
   });
+});
+
+it("recreates an offline Spotify device and waits until its ready report reaches main", async () => {
+  const p = await player();
+  const oldReady = p.listeners.ready;
+  const oldOffline = p.listeners.not_ready;
+  const reconnect = p.reconnect();
+  await p.flush();
+  expect(p.sdk.disconnect).toHaveBeenCalledTimes(1);
+  expect(p.sdk.connect).toHaveBeenCalledTimes(2);
+  // Callbacks queued by the old SDK must not overwrite the replacement device.
+  oldReady({ device_id: "stale-device" });
+  oldOffline();
+  await p.flush();
+  expect(p.events.some(e => e.device === "stale-device")).toBe(false);
+  await p.listeners.ready({ device_id: "fresh-device" });
+  await reconnect;
+  expect(p.events).toContainEqual(expect.objectContaining({ event: "ready", device: "fresh-device" }));
+});
+
+it("bounds Spotify reconnection and allows another attempt after timeout", async () => {
+  vi.useFakeTimers();
+  try {
+    const p = await player();
+    p.sdk.connect.mockImplementationOnce(() => new Promise<boolean>(() => {}));
+    const reconnect = p.reconnect();
+    const failure = expect(reconnect).rejects.toThrow("timed out");
+    await vi.advanceTimersByTimeAsync(15000);
+    await failure;
+    const retry = p.reconnect();
+    await p.flush();
+    await p.listeners.ready({ device_id: "retry-device" });
+    await retry;
+  } finally {
+    vi.useRealTimers();
+  }
 });

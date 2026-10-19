@@ -4,6 +4,8 @@ let yt,
   ytReady = false,
   sdkReady = false,
   connecting = false;
+let reconnecting = null,
+  readyWaiter = null;
 let state = null,
   ytKey = "",
   ytPlayingKey = "",
@@ -157,21 +159,25 @@ async function connectSpotify() {
     getOAuthToken: (callback) =>
       post("/sdk-token")
         .then((token) => callback(token.access))
-        .catch(() =>
-          report("not_ready", {
+        .catch(() => {
+          if (spotify === instance) report("not_ready", {
             message: "Spotify authorization expired. Reconnect in Setup.",
-          }),
-        ),
+          });
+        }),
   });
-  spotify.addListener("ready", ({ device_id }) => {
+  const instance = spotify;
+  spotify.addListener("ready", async ({ device_id }) => {
+    if (spotify !== instance) return;
     status.textContent = "Spotify browser player ready";
-    report("ready", { device: device_id });
+    const delivered = await report("ready", { device: device_id });
+    if (spotify === instance && delivered !== false) readyWaiter?.();
   });
-  spotify.addListener("not_ready", () =>
-    report("not_ready", {
+  spotify.addListener("not_ready", () => {
+    if (spotify !== instance) return;
+    void report("not_ready", {
       message: "Spotify browser player offline. Reconnect in Setup.",
-    }),
-  );
+    });
+  });
   for (const type of [
     "initialization_error",
     "authentication_error",
@@ -180,6 +186,7 @@ async function connectSpotify() {
     "autoplay_failed",
   ]) {
     spotify.addListener(type, () => {
+      if (spotify !== instance) return;
       status.textContent =
         type === "initialization_error"
           ? "DRM unavailable. See Spotify setup requirements."
@@ -189,18 +196,54 @@ async function connectSpotify() {
       report("not_ready", { message: status.textContent });
     });
   }
-  spotify.addListener("player_state_changed", observeSpotify);
+  spotify.addListener("player_state_changed", (sample) => {
+    if (spotify === instance) observeSpotify(sample);
+  });
   try {
-    if (!(await spotify.connect())) throw Error("SDK connection refused");
+    if (!(await instance.connect())) throw Error("SDK connection refused");
   } catch {
-    report("not_ready", {
+    if (spotify === instance) report("not_ready", {
       message:
         "Spotify browser playback could not initialise. Check DRM support.",
     });
   } finally {
-    connecting = false;
+    if (spotify === instance) connecting = false;
   }
 }
+// Main requests one fresh SDK device after an expired device or playback 404.
+// Resolve only after main has accepted the new device ID; never choose another device.
+window.encoreReconnectSpotify = () => {
+  if (reconnecting) return reconnecting;
+  reconnecting = (async () => {
+    if (!sdkReady || !state?.spotifyConnected || connecting)
+      throw Error("Spotify SDK is not ready. Retry Play.");
+    const previous = spotify;
+    spotify = null;
+    previous?.disconnect();
+    spotifyActive = false;
+    spotifyPrevious = null;
+    status.textContent = "Reconnecting Spotify browser player…";
+    let timeout;
+    const ready = new Promise((resolve, reject) => {
+      readyWaiter = resolve;
+      timeout = setTimeout(() => reject(Error("Spotify reconnect timed out")), 15000);
+    });
+    try {
+      void connectSpotify();
+      await ready;
+    } catch (error) {
+      const failed = spotify;
+      spotify = null;
+      connecting = false;
+      failed?.disconnect();
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+      readyWaiter = null;
+    }
+  })().finally(() => { reconnecting = null; });
+  return reconnecting;
+};
 let updating = false,
   again = false;
 async function update() {

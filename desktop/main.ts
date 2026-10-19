@@ -40,6 +40,7 @@ import { Playlists } from "../src/core/playlists";
 import { Queue } from "../src/core/queue";
 import { Store } from "./store";
 import { Providers } from "./providers";
+import { playSpotify } from "./spotify-playback";
 import { StreamerBot } from "./streamerbot";
 import { origin, trustedFrame, safeMessage } from "./security";
 import { importDiagnostics, requestVolume, chatTarget } from "./compatibility";
@@ -216,6 +217,7 @@ function showPlayer() {
       contextIsolation: true,
       sandbox: true,
       partition: "encore-player",
+      backgroundThrottling: false,
       autoplayPolicy: "no-user-gesture-required",
     },
   });
@@ -255,16 +257,34 @@ async function start(resume = false) {
   }
   showPlayer();
   if (queue.current.source === "spotify") {
-    if (!spotifyDevice)
-      throw Error(
-        "Encore Spotify browser player is not ready. Connect Spotify and check DRM status in Setup.",
-      );
-    await providers.spotify(
-      "/me/player/play?device_id=" + encodeURIComponent(spotifyDevice),
-      "PUT",
-      resume && startedKey === key(queue.current)
-        ? undefined
-        : { uris: ["spotify:track:" + queue.current.id] },
+    let body: { uris: string[]; position_ms?: number } | undefined = resume && startedKey === key(queue.current)
+      ? undefined
+      : { uris: ["spotify:track:" + queue.current.id] };
+    await playSpotify(
+      () => spotifyDevice,
+      async () => {
+        if (!body) body = {
+          uris: ["spotify:track:" + queue.current!.id],
+          position_ms: playbackSample.generation === generation
+            ? Math.round(playbackSample.position * 1000) : 0,
+        };
+        spotifyDevice = "";
+        spotifyStatus = "Reconnecting browser player…";
+        queue.playing = false;
+        emit();
+        try {
+          await player!.webContents.executeJavaScript("window.encoreReconnectSpotify()");
+        } catch {
+          spotifyStatus = "Browser player unavailable";
+          emit();
+          throw Error("Spotify browser player could not reconnect. Retry Play or check Spotify connection and DRM support in Setup.");
+        }
+      },
+      (device) => providers.spotify(
+        "/me/player/play?device_id=" + encodeURIComponent(device),
+        "PUT",
+        body,
+      ),
     );
   }
   if (!resume || startedKey !== key(queue.current)) trackGeneration++;

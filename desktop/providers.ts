@@ -1,7 +1,7 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import { TrackSchema, type Track } from "../src/core/contracts";
 export const redirectUri = "http://127.0.0.1:17843/callback";
-class ProviderHttpError extends Error {
+export class ProviderHttpError extends Error {
   constructor(public readonly status: number, message: string) {
     super(message);
   }
