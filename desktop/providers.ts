@@ -6,14 +6,24 @@ export class ProviderHttpError extends Error {
     super(message);
   }
 }
-async function json(url: string, init: RequestInit = {}) {
+async function json(url: string, init: RequestInit = {}, response: "json" | "none" = "json") {
   const res = await fetch(url, { ...init, signal: AbortSignal.timeout(12000) });
   if (!res.ok)
     throw new ProviderHttpError(
       res.status,
       `Provider returned ${res.status}. ${res.status === 401 ? "Reconnect your account." : res.status === 403 ? "Check API access, quota and Premium requirements." : res.status === 404 ? "The Encore browser player is not ready. Check Spotify connection and DRM support." : "Try again or check the provider dashboard."}`,
     );
-  return res.status === 204 ? null : res.json();
+  // Playback commands acknowledge success without a JSON contract. Some
+  // successful responses contain opaque text; never parse or expose it.
+  if (response === "none" || res.status === 204) {
+    await res.body?.cancel().catch(() => {});
+    return null;
+  }
+  try {
+    return await res.json();
+  } catch {
+    throw Error("Provider returned an invalid JSON response. Try again.");
+  }
 }
 export class Providers {
   youtubeKey = "";
@@ -95,7 +105,7 @@ export class Providers {
       await this.refreshing;
     }
   }
-  async spotify(path: string, method = "GET", body?: unknown): Promise<any> {
+  async spotify(path: string, method = "GET", body?: unknown, response: "json" | "none" = "json"): Promise<any> {
     await this.ensureToken();
     return json("https://api.spotify.com/v1" + path, {
       method,
@@ -104,7 +114,7 @@ export class Providers {
         "Content-Type": "application/json",
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
-    });
+    }, response);
   }
   disconnect() {
     this.oauth = undefined;

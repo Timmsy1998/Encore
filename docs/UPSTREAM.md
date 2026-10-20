@@ -24,7 +24,7 @@ For Encore's automatic Spotify-first chat search, actions must send the song-and
 
 | Feature | Encore |
 | --- | --- |
-| Playback | Spotify and YouTube inside the desktop app; bounded SDK device recovery for Spotify playback 404/offline devices (real-account endurance remains unverified) |
+| Playback | Spotify and YouTube inside the desktop app; bounded SDK device recovery for Spotify playback 404/offline devices; start/resume accepts successful acknowledgements without requiring JSON (real-account endurance remains unverified) |
 | Queue | Requests, then personal listening, then a rotating stream playlist; current song finishes first |
 | Playlists | Separate library page, closed until opened; mixed Spotify/YouTube imports, saved playlist/song ordering with drag handles and move buttons, and shuffled stream rotation |
 | In-app song search | Explicit result picker across Spotify and YouTube, platform labels and partial-provider failure warnings; chat keeps automatic matching |

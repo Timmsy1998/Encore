@@ -381,6 +381,30 @@ it("does not poll a paused YouTube player", async () => {
   p.sample();
   expect(p.yt.getCurrentTime).not.toHaveBeenCalled();
 });
+it("restarts Spotify progress sampling after pause and resume", async () => {
+  const current = { source: "spotify", id: "spotify001", duration: 180 };
+  const state = { current, playing: true, generation: 2, trackGeneration: 1, volume: 70, spotifyConnected: true };
+  const p = await player(state);
+  await p.listeners.ready({ device_id: "encore-device" });
+  const sample = (position: number) => ({ paused: false, position, duration: 180000, track_window: { current_track: { id: current.id } } });
+  p.sdk.getCurrentState.mockResolvedValue(sample(12000));
+  p.sample();
+  await p.flush();
+  expect(p.events).toContainEqual(expect.objectContaining({ event: "progress", position: 12, generation: 2 }));
+  await p.change({ ...state, playing: false, generation: 3 });
+  expect(p.sampling()).toBe(false);
+  p.sdk.getCurrentState.mockClear();
+  p.sample();
+  expect(p.sdk.getCurrentState).not.toHaveBeenCalled();
+  await p.change({ ...state, generation: 4 });
+  expect(p.sampling()).toBe(true);
+  for (const position of [13000, 14000]) {
+    p.sdk.getCurrentState.mockResolvedValue(sample(position));
+    p.sample();
+    await p.flush();
+    expect(p.events).toContainEqual(expect.objectContaining({ event: "progress", position: position / 1000, generation: 4 }));
+  }
+});
 it("does not overlap slow Spotify state samples", async () => {
   const p = await player();
   await p.change({ current: { source: "spotify", id: "spotify001" }, playing: true, generation: 2, trackGeneration: 2, spotifyConnected: true });

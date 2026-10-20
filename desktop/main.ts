@@ -298,6 +298,7 @@ async function start(resume = false) {
         "/me/player/play?device_id=" + encodeURIComponent(device),
         "PUT",
         body,
+        "none",
       ),
     );
   }

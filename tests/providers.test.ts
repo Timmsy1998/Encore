@@ -1,8 +1,52 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Providers } from "../desktop/providers";
+import { Providers, ProviderHttpError } from "../desktop/providers";
+import { playSpotify } from "../desktop/spotify-playback";
 afterEach(() => vi.unstubAllGlobals());
 const reply = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status });
+describe("Spotify playback acknowledgements", () => {
+  const connected = () => {
+    const providers = new Providers(() => {});
+    providers.access = "test-access";
+    providers.expires = Date.now() + 3600000;
+    return providers;
+  };
+  it.each([
+    [204, null],
+    [200, ""],
+    [200, "H1teI2ygNu-opaque-acknowledgement"],
+    [202, "accepted"],
+  ] as const)("allows playback state to advance after HTTP %s acknowledgements", async (status, body) => {
+    const providers = connected();
+    const fetch = vi.fn().mockImplementation(async () => new Response(body, { status }));
+    vi.stubGlobal("fetch", fetch);
+    const reconnect = vi.fn();
+    // Exercise both initial play and resume through the same provider path as main.
+    for (const payload of [{ uris: ["spotify:track:" + "a".repeat(22)] }, undefined]) {
+      await expect(playSpotify(
+        () => "encore-device",
+        reconnect,
+        device => providers.spotify(`/me/player/play?device_id=${device}`, "PUT", payload, "none"),
+      )).resolves.toBeUndefined();
+    }
+    expect(reconnect).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch.mock.calls[1][0]).toBe("https://api.spotify.com/v1/me/player/play?device_id=encore-device");
+    expect(fetch.mock.calls[1][1].body).toBeUndefined();
+  });
+  it.each([401, 403, 404, 429, 500])("preserves HTTP %s failures without exposing the response body", async status => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("private-response-body", { status })));
+    const result = connected().spotify("/me/player/play?device_id=encore-device", "PUT", undefined, "none");
+    await expect(result).rejects.toBeInstanceOf(ProviderHttpError);
+    await expect(result).rejects.toMatchObject({ status });
+    await expect(result).rejects.not.toThrow("private-response-body");
+  });
+  it("still requires JSON for metadata and sanitises parse errors", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("private-response-body")));
+    await expect(connected().spotify("/tracks/" + "a".repeat(22)))
+      .rejects.toThrow("Provider returned an invalid JSON response. Try again.");
+  });
+});
 describe("provider authentication and input boundaries", () => {
   it("uses one-use PKCE and refuses callbacks with the wrong state", async () => {
     const p = new Providers(() => {});
