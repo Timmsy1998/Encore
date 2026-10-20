@@ -29,6 +29,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import {
   CommandSchema,
+  SongSearchInputSchema,
   SettingsSchema,
   migrate,
   key,
@@ -1027,6 +1028,13 @@ if (!app.requestSingleInstanceLock()) {
         )
           throw Error("Untrusted sender");
         return snapshot();
+      });
+      ipcMain.handle("encore:searchSongs", async (e, input) => {
+        if (!trustedFrame(e.senderFrame?.url ?? "", e.senderFrame === main?.webContents.mainFrame))
+          throw Error("Untrusted sender");
+        const result = SongSearchInputSchema.safeParse(input);
+        if (!result.success) throw Error("Invalid search");
+        return providers.searchSongs(result.data);
       });
       ipcMain.handle("encore:command", async (e, input) => {
         if (

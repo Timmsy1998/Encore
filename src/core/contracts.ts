@@ -12,6 +12,8 @@ export const TrackSchema = z.object({
   user: z.string().min(1).max(100).default("Streamer"),
 });
 export type Track = z.infer<typeof TrackSchema>;
+export const SongSearchInputSchema = z.string().trim().min(1).max(1000);
+export type SongSearchResult = { tracks: Track[]; warnings: string[] };
 export const OverlayAppearanceSchema = z.object({
   overlayAccent: z
     .string()
@@ -196,6 +198,7 @@ export const CommandSchema = z.discriminatedUnion("type", [
 export type Command = z.infer<typeof CommandSchema>;
 export interface EncoreBridge {
   snapshot(): Promise<Snapshot>;
+  searchSongs(input: string): Promise<SongSearchResult>;
   command(command: Command): Promise<void>;
   subscribe(callback: (s: Snapshot) => void): () => void;
 }

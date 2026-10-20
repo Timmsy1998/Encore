@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { Command, EncoreBridge, Snapshot } from "../src/core/contracts";
 const bridge: EncoreBridge = {
+  searchSongs: (input: string) => ipcRenderer.invoke("encore:searchSongs", input),
   snapshot: () => ipcRenderer.invoke("encore:snapshot"),
   command: (c: Command) => ipcRenderer.invoke("encore:command", c),
   subscribe: (callback: (s: Snapshot) => void) => {

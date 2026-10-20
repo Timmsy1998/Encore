@@ -1,5 +1,5 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
-import { TrackSchema, type Track } from "../src/core/contracts";
+import { TrackSchema, type Track, type SongSearchResult } from "../src/core/contracts";
 export const redirectUri = "http://127.0.0.1:17843/callback";
 export class ProviderHttpError extends Error {
   constructor(public readonly status: number, message: string) {
@@ -180,23 +180,38 @@ export class Providers {
     if (!track) throw Error("This video is unavailable or cannot be embedded.");
     return track;
   }
+  private async spotifySearch(input: string, user: string): Promise<Track[]> {
+    const data = await this.spotify(
+      "/search?" + new URLSearchParams({ q: input, type: "track", limit: "10" }),
+    );
+    return (data.tracks?.items ?? []).flatMap((item: any) => {
+      if (!item || item.type !== "track" || item.is_local || item.is_playable === false)
+        return [];
+      try { return [this.spotifyTrack(item, user)]; } catch { return []; }
+    });
+  }
   private async search(input: string, user: string): Promise<Track> {
     if (this.access || this.refresh) {
-      const data = await this.spotify(
-        "/search?" +
-          new URLSearchParams({ q: input, type: "track", limit: "10" }),
-      );
-      const match = data.tracks?.items?.find(
-        (item: any) =>
-          item &&
-          item.type === "track" &&
-          !item.is_local &&
-          item.is_playable !== false &&
-          item.duration_ms > 0 &&
-          item.duration_ms <= 86400000,
-      );
-      if (match) return this.spotifyTrack(match, user);
+      const tracks = await this.spotifySearch(input, user);
+      if (tracks.length) return tracks[0];
     }
+    return (await this.youtubeSearch(input, user))[0];
+  }
+  async searchSongs(input: string): Promise<SongSearchResult> {
+    const results = await Promise.allSettled([
+      this.spotifySearch(input, "Streamer"),
+      this.youtubeSearch(input, "Streamer"),
+    ]);
+    const tracks: Track[] = [];
+    const warnings: string[] = [];
+    results.forEach((result, index) => {
+      const name = index === 0 ? "Spotify" : "YouTube";
+      if (result.status === "fulfilled") tracks.push(...result.value);
+      else warnings.push(`${name}: ${result.reason instanceof Error ? result.reason.message : "Search unavailable. Try again."}`);
+    });
+    return { tracks: [...new Map(tracks.map(track => [`${track.source}:${track.id}`, track])).values()], warnings };
+  }
+  private async youtubeSearch(input: string, user: string): Promise<Track[]> {
     const results = await this.youtube("search", {
       part: "snippet",
       type: "video",
@@ -240,7 +255,7 @@ export class Providers {
     candidates.sort((a, b) => b.rank - a.rank);
     if (!candidates.length)
       throw Error("No playable track found in the search results.");
-    return candidates[0].track;
+    return candidates.map(candidate => candidate.track);
   }
   private youtubeTrack(item: any, id: string, user: string): Track | null {
     if (!item?.status?.embeddable) return null;

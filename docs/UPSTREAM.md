@@ -18,7 +18,7 @@ STOP_SONG          IMPORT_DIAGNOSTICS
 
 Moderator permissions and channel-point bindings are handled by Streamer.bot. Forced requests bypass request limits and the requests-off switch, but still respect bans and duration limits. Diagnostics check the import's version and capabilities; command permissions must be checked in Streamer.bot.
 
-For Encore's Spotify-first text search, actions must send the song-and-artist text to Encore. An action that first turns that text into a YouTube link will keep that YouTube selection.
+For Encore's automatic Spotify-first chat search, actions must send the song-and-artist text to Encore. An action that first turns that text into a YouTube link will keep that YouTube selection.
 
 ## Feature differences
 
@@ -27,6 +27,7 @@ For Encore's Spotify-first text search, actions must send the song-and-artist te
 | Playback | Spotify and YouTube inside the desktop app; bounded SDK device recovery for Spotify playback 404/offline devices (real-account endurance remains unverified) |
 | Queue | Requests, then personal listening, then a rotating stream playlist; current song finishes first |
 | Playlists | Separate library page, closed until opened; mixed Spotify/YouTube imports, saved playlist/song ordering with drag handles and move buttons, and shuffled stream rotation |
+| In-app song search | Explicit result picker across Spotify and YouTube, platform labels and partial-provider failure warnings; chat keeps automatic matching |
 | Queue ordering | Queue / Up Next includes lane filters, search, requester details, action menus and a persistent next-track preview; request ordering uses drag handles or move buttons |
 | Playback workspace | Persistent player panel and transport with provider progress, seek, restart, skip, favourite, mute, stream shuffle and repeat |
 | Skip votes | One vote per viewer |

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, GripVertical, Library, Music2, Trash2 } from "lucide-react";
+import { SongSearch } from "./SongSearch";
 import { Button } from "./components/ui/button";
 import { key, type Command, type Snapshot } from "./core/contracts";
 
@@ -10,7 +11,6 @@ export function PlaylistLibrary({ state, busy, send }: {
 }) {
   const [selected, setSelected] = useState("");
   const [name, setName] = useState("");
-  const [input, setInput] = useState("");
   const [rename, setRename] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [drag, setDrag] = useState<{ playlist: string; track?: string }>();
@@ -54,7 +54,7 @@ export function PlaylistLibrary({ state, busy, send }: {
             }}>
             <Button variant="ghost" size="icon" aria-label={`Drag playlist ${item.name}`} disabled={busy} draggable={!busy}
               onDragStart={event => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", item.id); setDrag({ playlist: item.id }); }} onDragEnd={() => setDrag(undefined)}><GripVertical size={16} /></Button>
-            <button className="playlist-open" aria-label={`Open playlist ${item.name}`} onClick={() => { setSelected(item.id); setInput(""); setRename(""); setDeleting(false); setDrag(undefined); }}>
+            <button className="playlist-open" aria-label={`Open playlist ${item.name}`} onClick={() => { setSelected(item.id); setRename(""); setDeleting(false); setDrag(undefined); }}>
               <span className="playlist-cover"><Music2 size={24} /></span>
               <span className="playlist-card-info"><strong>{item.name}</strong><span>{item.tracks.length} songs · {Math.round(item.tracks.reduce((sum, track) => sum + track.duration, 0) / 60)} min{active?.id === item.id ? " · Stream playlist" : ""}</span></span>
               <ChevronRight size={18} />
@@ -78,12 +78,10 @@ export function PlaylistLibrary({ state, busy, send }: {
         <input aria-label="Rename playlist" placeholder={playlist.name} value={rename} maxLength={80} onChange={event => setRename(event.target.value)} />
         <Button variant="secondary" disabled={busy || !rename.trim()}>Rename</Button>
       </form>
-      <form className="playlist-controls" onSubmit={async event => { event.preventDefault(); if (await send({ type: "playlistAdd", id: playlist.id, input })) setInput(""); }}>
-        <input aria-label="Playlist song or URL" placeholder="Song and artist, track link, or playlist URL" value={input} maxLength={1000} onChange={event => setInput(event.target.value)} />
-        <Button disabled={busy || !input.trim()}>Add song</Button>
-        <Button type="button" variant="secondary" disabled={busy || !input.trim()} onClick={async () => { if (await send({ type: "playlistImport", id: playlist.id, input })) setInput(""); }}>Append playlist</Button>
-      </form>
-      <p className="muted">Searches prefer Spotify, then YouTube Music, then YouTube video. Imports append and skip duplicates. Drag songs or use the arrows to arrange them. Stream edits apply to future tracks; the current song finishes.</p>
+      <SongSearch key={playlist.id} label="Playlist song or URL" busy={busy} add={input => send({ type: "playlistAdd", id: playlist.id, input })}>
+        {(input, clear) => <Button type="button" variant="secondary" disabled={busy || !input.trim()} onClick={async () => { if (await send({ type: "playlistImport", id: playlist.id, input })) clear(); }}>Append playlist</Button>}
+      </SongSearch>
+      <p className="muted">Search Spotify and YouTube, then choose songs to add. Imports append and skip duplicates. Drag songs or use the arrows to arrange them. Stream edits apply to future tracks; the current song finishes.</p>
       <ol className="playlist-tracks" aria-label={`${playlist.name} tracks`}>
         {playlist.tracks.map((track, index) => <li key={key(track)}
           onDragOver={event => { if (!busy && drag?.playlist === playlist.id && drag.track) event.preventDefault(); }}

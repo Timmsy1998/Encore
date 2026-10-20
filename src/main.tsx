@@ -3,7 +3,6 @@ import {
   useEffect,
   useState,
   useRef,
-  type FormEvent,
   type ReactNode,
 } from "react";
 import { createRoot } from "react-dom/client";
@@ -27,13 +26,13 @@ import {
   Music2,
   MoreVertical,
   GripVertical,
-  Search,
   Monitor,
   CircleHelp,
 } from "lucide-react";
 import * as Switch from "@radix-ui/react-switch";
 import { Button } from "./components/ui/button";
 import { Playback, Cover, Provider, Timeline, artwork, time } from "./Playback";
+import { SongSearch } from "./SongSearch";
 import { PlaylistLibrary } from "./PlaylistLibrary";
 import {
   key,
@@ -132,7 +131,6 @@ function App() {
     [page, setPage] = useState<Page>("Queue"),
     [busy, setBusy] = useState(false),
     [localError, setLocalError] = useState(""),
-    [input, setInput] = useState(""),
     [search, setSearch] = useState(""),
     [password, setPassword] = useState(""),
     [apiKey, setApiKey] = useState(""),
@@ -190,14 +188,6 @@ function App() {
     void send({ type: "settings", settings });
   const open = (target: Extract<Command, { type: "open" }>["target"]) =>
     void send({ type: "open", target });
-  async function add(e: FormEvent) {
-    e.preventDefault();
-    if (!input.trim()) return;
-    if (
-      await send({ type: page === "Listening" ? "listen" : "request", input })
-    )
-      setInput("");
-  }
   if (!s)
     return (
       <main className="loading">
@@ -729,20 +719,7 @@ function App() {
                 </span>
               </div>
               {["Queue", "Listening"].includes(page) && (
-                <form className="add-track" onSubmit={add}>
-                  <Search size={21} />
-                  <input
-                    aria-label={
-                      page === "Queue" ? "Request track" : "Add listening track"
-                    }
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder="Find a song or paste a link"
-                  />
-                  <Button disabled={busy || !input.trim()} type="submit">
-                    <Plus size={19} />{page === "Queue" ? "Add song" : "Add music"}
-                  </Button>
-                </form>
+                <SongSearch key={page} label={page === "Queue" ? "Request track" : "Add listening track"} busy={busy} add={input => send({ type: page === "Listening" ? "listen" : "request", input })} />
               )}
               <div className="list-toolbar">
                 {page === "Queue" ? <div className="queue-filters" role="group" aria-label="Queue filters">{["All", "Requests", "Listening", "Playlist"].map(filter => <button key={filter} aria-label={`Show ${filter.toLowerCase()} tracks`} aria-pressed={queueFilter === filter} onClick={() => setQueueFilter(filter)}>{filter}</button>)}</div> : <span>{page.toUpperCase()}</span>}
@@ -897,17 +874,7 @@ function App() {
                       Paste a track below, add it, then press Play. This
                       confirms actual playback, not just account access.
                     </p>
-                    <form className="add-track" onSubmit={add}>
-                      <input
-                        aria-label="Test request"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder="YouTube or Spotify track URL"
-                      />
-                      <Button disabled={!input || busy}>
-                        Add test request
-                      </Button>
-                    </form>
+                    <SongSearch label="Test request" busy={busy} add={input => send({ type: "request", input })} />
                   </>
                 )}
                 <div className="setup-navigation">

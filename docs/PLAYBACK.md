@@ -22,7 +22,9 @@ Windows packages use Castlabs Electron for Widevine support and need VMP signing
 
 ## Search and imports
 
-Song-and-artist searches use this order:
+In-app searches in Queue, Listening, Setup and saved playlists show results from both Spotify and YouTube before adding anything. Each result shows its platform, artist and duration. Choose **Add** for the version you want; you can add multiple results. Provider failures appear beside any available results. Search needs a connected Spotify account and/or a configured YouTube Data API key. Explicit track links add the chosen track directly.
+
+Chat song-and-artist requests continue to select one match automatically in this order:
 
 1. Spotify, when connected.
 2. Artist Topic releases, auto-generated releases and official audio on YouTube.

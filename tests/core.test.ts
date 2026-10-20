@@ -4,6 +4,7 @@ import {
   defaults,
   migrate,
   CommandSchema,
+  SongSearchInputSchema,
   SettingsSchema,
   TrackSchema,
   key,
@@ -15,6 +16,14 @@ const track = (
   user = "Viewer",
   source: Track["source"] = "youtube",
 ): Track => ({ id, user, source, title: id, author: "Artist", duration: 180 });
+describe("song search boundary", () => {
+  it("accepts a bounded nonempty query and rejects invalid IPC payloads", () => {
+    expect(SongSearchInputSchema.parse("  Artist Song  ")).toBe("Artist Song");
+    for (const input of [null, {}, [], 42, "   ", "x".repeat(1001)]) {
+      expect(SongSearchInputSchema.safeParse(input).success).toBe(false);
+    }
+  });
+});
 describe("partial settings commands", () => {
   it("preserves setup progress and preferences when saving a Spotify client ID", () => {
     const saved = SettingsSchema.parse({ setupStep: 4, volume: 23, wsPort: 9000 });

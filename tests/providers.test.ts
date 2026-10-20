@@ -226,6 +226,40 @@ describe("request search preference", () => {
       reply({ items: [...items].reverse() }),
     ];
   }
+  it("returns choices from both services and filters unavailable tracks", async () => {
+    const p = setup();
+    vi.spyOn(p, "spotify").mockResolvedValue({ tracks: { items: [spotifySong, { ...spotifySong, is_playable: false }] } });
+    vi.spyOn(p, "youtube").mockImplementation(async route => route === "search"
+      ? { items: [{ id: { videoId: "video000001" } }, { id: { videoId: "hidden00001" } }] }
+      : { items: [video("video000001", "Song video"), video("hidden00001", "Hidden", "Artist", "", false)] });
+    const result = await p.searchSongs("Artist Song");
+    expect(result.tracks.map(track => track.source)).toEqual(["spotify", "youtube"]);
+    expect(result.warnings).toEqual([]);
+    expect(p.spotify).toHaveBeenCalledWith(expect.stringContaining("q=Artist+Song"));
+    expect(p.youtube).toHaveBeenCalledWith("search", expect.objectContaining({ q: "Artist Song" }));
+  });
+  it.each(["spotify", "youtube"] as const)("keeps results when %s fails", async failed => {
+    const p = setup();
+    vi.spyOn(p, "spotify").mockImplementation(async () => {
+      if (failed === "spotify") throw Error("Reconnect your account.");
+      return { tracks: { items: [spotifySong] } };
+    });
+    vi.spyOn(p, "youtube").mockImplementation(async route => {
+      if (failed === "youtube") throw Error("Quota exhausted.");
+      return route === "search" ? { items: [{ id: { videoId: "video000001" } }] } : { items: [video("video000001", "Song")] };
+    });
+    const result = await p.searchSongs("Artist Song");
+    expect(result.tracks).toHaveLength(1);
+    expect(result.tracks[0].source).not.toBe(failed);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain(failed === "spotify" ? "Spotify:" : "YouTube:");
+  });
+  it("reports both unavailable services without inventing results", async () => {
+    const p = new Providers(() => {});
+    expect(await p.searchSongs("Song")).toEqual({ tracks: [], warnings: [
+      "Spotify: Connect Spotify first.", "YouTube: Add and test your YouTube Data API key in Setup.",
+    ] });
+  });
   it("prefers Spotify and safely encodes the entire title query", async () => {
     const fetch = vi
       .fn()

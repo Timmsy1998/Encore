@@ -26,6 +26,7 @@ async function boot(page: Page, setup = false, updateReady = false) {
     const callbacks = new Set<(state: Snapshot) => void>();
     window.encore = {
       snapshot: async () => state,
+      searchSongs: async () => { throw Error("Provider unavailable: development test fixture."); },
       subscribe: (callback) => {
         callbacks.add(callback);
         return () => {
@@ -109,7 +110,7 @@ test("personal listening, errors, navigation and window scaling", async ({
   await page
     .getByRole("textbox", { name: "Add listening track" })
     .fill("A song to find");
-  await page.getByRole("button", { name: "Add music", exact: true }).click();
+  await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Provider unavailable");
   await expect(
     page.getByRole("textbox", { name: "Add listening track" }),
@@ -487,4 +488,48 @@ test("queue filters, action menus and transport send explicit playback commands"
     { type: "seek", key: "youtube:abcdefghijk", generation: 7, position: 31 },
     { type: "settings", settings: { volume: 0 } }, { type: "settings", settings: { volume: 70 } },
   ]));
+});
+
+test("song search offers both platforms and adds only the selected link", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    window.encore.searchSongs = async () => ({ tracks: [
+      { id: "b".repeat(22), source: "spotify", title: "Song", author: "Artist", duration: 180, user: "Streamer" },
+      { id: "video000001", source: "youtube", title: "Song video", author: "Artist", duration: 190, user: "Streamer" },
+    ], warnings: [] });
+    window.encore.command = async command => { localStorage.setItem("selected-song", JSON.stringify(command)); };
+  });
+  await page.getByRole("textbox", { name: "Request track", exact: true }).fill("Artist Song");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  const results = page.getByRole("list", { name: "Song search results" });
+  await expect(results.locator(".provider.spotify")).toBeVisible();
+  await expect(results.locator(".provider.youtube")).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("selected-song"))).toBeNull();
+  await page.getByRole("button", { name: "Add Song video from YouTube", exact: true }).click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("selected-song")!))).toEqual({ type: "request", input: "https://www.youtube.com/watch?v=video000001" });
+  await expect(page.getByRole("button", { name: "Add Song video from YouTube", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Listening", exact: true }).click();
+  await page.getByRole("textbox", { name: "Add listening track", exact: true }).fill("Artist Song");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await page.getByRole("button", { name: "Add Song from Spotify", exact: true }).click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("selected-song")!))).toEqual({ type: "listen", input: `https://open.spotify.com/track/${"b".repeat(22)}` });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("search shows loading, empty and partial failures and discards stale results", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    window.encore.searchSongs = () => new Promise(resolve => window.addEventListener("finish-search", () => resolve({ tracks: [], warnings: ["YouTube: Quota exhausted."] }), { once: true }));
+  });
+  const input = page.getByRole("textbox", { name: "Request track", exact: true });
+  await input.fill("Old query");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page.getByText("Searching Spotify and YouTube…")).toBeVisible();
+  await input.fill("New query");
+  await page.evaluate(() => window.dispatchEvent(new Event("finish-search")));
+  await expect(page.getByText("YouTube: Quota exhausted.")).toHaveCount(0);
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await page.evaluate(() => window.dispatchEvent(new Event("finish-search")));
+  await expect(page.getByText("No songs found. Try another song or artist.")).toBeVisible();
+  await expect(page.getByText("YouTube: Quota exhausted.")).toBeVisible();
 });

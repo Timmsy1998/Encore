@@ -33,7 +33,7 @@ No Client Secret is needed. Once Encore shows **Browser player ready**, you're r
 
 Enable **YouTube Data API v3** in a Google Cloud project, then enter and test the API key in Encore. YouTube playback happens inside Encore; keep its player visible while listening.
 
-When you search by song and artist, Encore tries Spotify first, then artist Topic releases and official audio on YouTube, then other YouTube videos. Pasting a track link uses that track directly.
+In-app song searches show Spotify and YouTube options with artist, duration and platform labels. Choose **Add** beside each song you want. Connect Spotify and configure a YouTube Data API key to search both; if one service fails, available results and a warning remain visible. Pasting a track link adds that track directly. Chat requests still select a match automatically, preferring Spotify and then YouTube audio.
 
 ### Chat requests
 

@@ -969,3 +969,15 @@ h1 { font-size: 32px; font-weight: 700; margin: 0 0 3px; line-height: 1.2; lette
 .now-panel { display: flex; flex-direction: column; overflow: hidden; }
 .panel-heading, .provider-space { flex-shrink: 0; }
 .now-details { min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: #39414a transparent; }
+
+.song-search { min-width: 0; }
+.song-search-results { margin-bottom: 20px; border: 1px solid var(--border, #34343c); border-radius: 12px; padding: 12px; }
+.song-search-results ul { list-style: none; padding: 0; margin: 0; max-height: 420px; overflow-y: auto; }
+.song-search-results li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border, #34343c); }
+.song-search-title { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.song-search-title strong, .song-search-title > span { overflow-wrap: anywhere; }
+.song-search-title > span { color: var(--muted, #aaa); font-size: 12px; }
+.song-search-title .provider { align-self: flex-start; }
+.song-search-results .list-toolbar { flex-wrap: wrap; gap: 8px; }
+.song-search .add-track { flex-wrap: wrap; }
+.song-search .add-track input { min-width: 140px; }

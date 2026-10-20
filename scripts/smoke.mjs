@@ -118,6 +118,10 @@ try {
         let status = 200;
         if (address.href === "https://accounts.spotify.com/api/token")
           body = { access_token: "smoke-access", refresh_token: "smoke-refresh", expires_in: 3600 };
+        else if (address.hostname === "api.spotify.com" && address.pathname === "/v1/search")
+          body = { tracks: { items: [{ id: "b".repeat(22), type: "track", name: "Spotify search smoke", artists: [{ name: "Fixture" }], duration_ms: 180000 }] } };
+        else if (address.hostname === "www.googleapis.com" && address.pathname.endsWith("/search"))
+          body = { items: [{ id: { videoId: "abcdefghijk" } }] };
         else if (address.hostname === "api.spotify.com" && address.pathname.endsWith("/items"))
           body = { items: [{ item: { id: "b".repeat(22), type: "track", name: "Spotify import smoke", artists: [{ name: "Fixture" }], duration_ms: 180000 } }] };
         else if (address.hostname === "www.googleapis.com" && address.pathname.endsWith("/playlistItems")) {
@@ -134,6 +138,11 @@ try {
       callback.searchParams.set("state", authUrl.searchParams.get("state"));
       callback.searchParams.set("code", "smoke-code");
       expect((await fetch(callback)).status).toBe(200);
+      const choices = await window.evaluate(() => window.encore.searchSongs("Fixture song"));
+      expect(choices.tracks.map(track => track.source)).toEqual(["spotify", "youtube"]);
+      expect(choices.warnings).toEqual([]);
+      expect((await window.evaluate(() => window.encore.snapshot())).queue).toEqual([]);
+      expect(await window.evaluate(() => window.encore.searchSongs(" ").then(() => false, () => true))).toBe(true);
       for (const [url, source] of [
         ["https://open.spotify.com/playlist/" + "a".repeat(22), "spotify"],
         ["https://www.youtube.com/playlist?list=PLabcdefghijk", "youtube"],
