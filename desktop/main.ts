@@ -58,7 +58,6 @@ let quitting = false,
   bot: StreamerBot;
 let secure = false,
   password = "",
-  youtube = "Not tested",
   streamerbot = "Disconnected",
   error = "",
   importStatus = "Not checked";
@@ -92,7 +91,8 @@ function snapshot(): Snapshot {
     playing: queue.playing,
     currentLane: queue.currentLane,
     streamerbot,
-    youtube,
+    youtube: providers.youtubeStatus,
+    youtubeConfigured: !!providers.youtubeKey,
     spotify: providers.refresh ? spotifyStatus : "Disconnected",
     error,
     logs,
@@ -491,7 +491,6 @@ async function command(c: Command) {
     case "secrets":
       if (c.youtube !== undefined) {
         providers.youtubeKey = c.youtube;
-        youtube = "Not tested";
       }
       if (c.password !== undefined) password = c.password;
       persistSecrets();
@@ -567,7 +566,6 @@ async function command(c: Command) {
       break;
     case "testYoutube":
       await providers.validateYoutube();
-      youtube = "API verified · playback requires player test";
       break;
     case "spotifyConnect":
       await shell.openExternal(providers.begin());
@@ -623,7 +621,7 @@ async function command(c: Command) {
             version: app.getVersion(),
             platform: process.platform,
             streamerbot,
-            youtube,
+            youtube: providers.youtubeStatus,
             spotify: !!providers.refresh,
             secureStorage: secure,
             importStatus,
@@ -994,7 +992,7 @@ if (!app.requestSingleInstanceLock()) {
       }
       store = new Store(app.getPath("userData"));
       queue = new Queue(store.load());
-      providers = new Providers(() => persistSecrets());
+      providers = new Providers(() => persistSecrets(), emit);
       providers.clientId = queue.state.settings.clientId;
       discord = new DiscordPresence(emit);
       discord.update(snapshot());

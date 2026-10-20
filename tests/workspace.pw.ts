@@ -7,7 +7,8 @@ async function boot(page: Page, setup = false, updateReady = false) {
     playing: false,
     currentLane: "request",
     streamerbot: "Disconnected",
-    youtube: "Not tested",
+    youtube: "Not configured",
+    youtubeConfigured: false,
     spotify: "Disconnected",
     error: "",
     logs: [],
@@ -110,6 +111,33 @@ test("resumable wizard and optional services", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Queue / Up Next" }),
   ).toBeVisible();
+});
+test("saved YouTube keys remain visibly configured without exposing the secret", async ({ page }) => {
+  await boot(page, true);
+  await page.evaluate(async () => {
+    const state = await window.encore.snapshot();
+    state.settings.setupStep = 3;
+    state.youtubeConfigured = true;
+    state.youtube = "Key configured · API check pending";
+    state.secureStorage = true;
+    localStorage.setItem("fixture-state", JSON.stringify(state));
+  });
+  await page.reload();
+  const input = page.getByLabel("YouTube API key");
+  await expect(input).toHaveValue("");
+  await expect(input).toHaveAttribute("placeholder", "•••••••• (saved key)");
+  await expect(page.getByText("API key saved securely.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "API check pending" })).toBeVisible();
+  await page.getByRole("button", { name: "Save & test API", exact: true }).click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("fixture-commands") || "[]")))
+    .toEqual([{ type: "testYoutube" }]);
+  await page.evaluate(async () => {
+    const state = await window.encore.snapshot();
+    state.secureStorage = false;
+    localStorage.setItem("fixture-state", JSON.stringify(state));
+  });
+  await page.reload();
+  await expect(page.getByText("API key set for this session only.", { exact: false })).toBeVisible();
 });
 test("personal listening, errors, navigation and window scaling", async ({
   page,

@@ -257,13 +257,15 @@ function App() {
           Google Cloud <ExternalLink size={14} />
         </Button>
       </div>
-      <Field label="YouTube API key">
+      <Field label="YouTube API key" hint={s.youtubeConfigured
+        ? s.secureStorage ? "API key saved securely. Leave blank to keep it, or paste a replacement." : "API key set for this session only. Leave blank to keep it. OS secure storage is unavailable."
+        : "Paste your YouTube Data API key, then save and test it."}>
         <input
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           type="password"
           autoComplete="off"
-          placeholder="Paste a key to replace the saved key"
+          placeholder={s.youtubeConfigured ? "•••••••• (saved key)" : "Paste your API key"}
         />
       </Field>
       <div className="actions">

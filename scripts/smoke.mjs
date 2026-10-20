@@ -92,6 +92,16 @@ try {
     await expect.poll(() => app.evaluate(() => globalThis.encoreSmokeYoutubeKey)).toBe("encore-smoke-key");
     await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).youtube)
       .toContain("API verified");
+    expect((await window.evaluate(() => window.encore.snapshot())).youtubeConfigured).toBe(true);
+    await expect(window.getByLabel("YouTube API key")).toHaveValue("");
+    await expect(window.getByLabel("YouTube API key")).toHaveAttribute("placeholder", "•••••••• (saved key)");
+    expect(JSON.stringify(await window.evaluate(() => window.encore.snapshot()))).not.toContain("encore-smoke-key");
+    await window.reload();
+    await expect(window.getByLabel("YouTube API key")).toHaveAttribute("placeholder", "•••••••• (saved key)");
+    await expect(window.getByRole("status").filter({ hasText: "API verified" })).toBeVisible();
+    // An empty replacement field must test the existing key, not erase it.
+    await window.getByRole("button", { name: "Save & test API", exact: true }).click();
+    await expect.poll(() => app.evaluate(() => globalThis.encoreSmokeYoutubeKey)).toBe("encore-smoke-key");
     expect((await window.evaluate(() => window.encore.snapshot())).settings.setupStep).toBe(3);
     expect((await window.evaluate(() => window.encore.snapshot())).settings.wsPort).toBe(65534);
     expect((await window.evaluate(() => window.encore.snapshot())).settings.volume).toBe(23);

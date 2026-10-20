@@ -26,14 +26,27 @@ async function json(url: string, init: RequestInit = {}, response: "json" | "non
   }
 }
 export class Providers {
-  youtubeKey = "";
+  private youtubeCredential = "";
+  youtubeStatus = "Not configured";
+  get youtubeKey() { return this.youtubeCredential; }
+  set youtubeKey(value: string) {
+    const key = value.trim();
+    if (key === this.youtubeCredential) return;
+    this.youtubeCredential = key;
+    this.setYoutubeStatus(key ? "Key configured · API check pending" : "Not configured");
+  }
+  private setYoutubeStatus(status: string) {
+    if (this.youtubeStatus === status) return;
+    this.youtubeStatus = status;
+    this.youtubeChanged();
+  }
   clientId = "";
   access = "";
   refresh = "";
   expires = 0;
   private oauth?: { state: string; verifier: string; expires: number };
   private refreshing?: Promise<void>;
-  constructor(private persist: () => void) {}
+  constructor(private persist: () => void, private youtubeChanged: () => void = () => {}) {}
   begin() {
     if (!/^[a-f0-9]{32}$/.test(this.clientId))
       throw Error("Save a valid Spotify Client ID first.");
@@ -126,12 +139,22 @@ export class Providers {
   async youtube(route: string, params: Record<string, string>) {
     if (!this.youtubeKey)
       throw Error("Add and test your YouTube Data API key in Setup.");
-    return json(
-      "https://www.googleapis.com/youtube/v3/" +
-        route +
-        "?" +
-        new URLSearchParams({ ...params, key: this.youtubeKey }),
-    );
+    const credential = this.youtubeKey;
+    try {
+      const result = await json(
+        "https://www.googleapis.com/youtube/v3/" +
+          route +
+          "?" +
+          new URLSearchParams({ ...params, key: credential }),
+      );
+      if (this.youtubeKey === credential)
+        this.setYoutubeStatus("API verified · playback requires player test");
+      return result;
+    } catch (error) {
+      if (this.youtubeKey === credential)
+        this.setYoutubeStatus("API request failed · check key, quota or connection and retry");
+      throw error;
+    }
   }
   async validateYoutube() {
     await this.youtube("videos", { part: "id", id: "M7lc1UVf-VE" });

@@ -120,6 +120,7 @@ export type Snapshot = SavedState & {
   currentLane: string;
   streamerbot: string;
   youtube: string;
+  youtubeConfigured: boolean;
   spotify: string;
   error: string;
   logs: string[];

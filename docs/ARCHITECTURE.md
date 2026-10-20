@@ -35,6 +35,8 @@ Spotify and YouTube run in a separate sandboxed `WebContentsView` without the ap
 
 Spotify start/resume accepts successful HTTP acknowledgements without parsing their bodies as JSON. Main can then publish the playing state and resume provider progress sampling. Metadata and OAuth responses still require JSON, with sanitised parse errors. HTTP failures retain their status and recovery behaviour.
 
+YouTube setup exposes only a configured flag and API status to React, never the saved key. The empty replacement field shows a masked saved-key placeholder and explains secure versus session-only storage. Restored keys start as configured with an API check pending; successful API calls verify the current key, failures show a retry state, and changing the key resets verification. Verification is session-only and does not imply browser playback readiness.
+
 The local server listens at `127.0.0.1:17843`. It checks the Host header, routes, origins and request sizes. Overlay routes expose current-track information only. Player control endpoints require a random per-process bearer token. Spotify login uses PKCE and expiring, one-use state.
 
 Credentials use Electron's `safeStorage`. Linux's plaintext backend is rejected; without secure storage, credentials are session-only and the app shows a warning. Backups omit credentials.

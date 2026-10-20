@@ -4,6 +4,48 @@ import { playSpotify } from "../desktop/spotify-playback";
 afterEach(() => vi.unstubAllGlobals());
 const reply = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status });
+describe("YouTube credential status", () => {
+  it("distinguishes configured keys from verification and keeps verification when the same key is saved", async () => {
+    const changed = vi.fn();
+    const p = new Providers(() => {}, changed);
+    expect(p.youtubeStatus).toBe("Not configured");
+    p.youtubeKey = "  saved-key  ";
+    expect(p.youtubeKey).toBe("saved-key");
+    expect(p.youtubeStatus).toContain("Key configured");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply({ items: [] })));
+    await p.youtube("videos", { part: "id", id: "M7lc1UVf-VE" });
+    expect(p.youtubeStatus).toContain("API verified");
+    p.youtubeKey = "saved-key";
+    expect(p.youtubeStatus).toContain("API verified");
+    expect(changed).toHaveBeenCalledTimes(2);
+    p.youtubeKey = "replacement";
+    expect(p.youtubeStatus).toContain("API check pending");
+    p.youtubeKey = "";
+    expect(p.youtubeStatus).toBe("Not configured");
+  });
+  it("shows failed requests and recovers when the same key works again", async () => {
+    const p = new Providers(() => {});
+    p.youtubeKey = "saved-key";
+    const fetch = vi.fn().mockResolvedValueOnce(reply({}, 403)).mockResolvedValueOnce(reply({ items: [] }));
+    vi.stubGlobal("fetch", fetch);
+    await expect(p.validateYoutube()).rejects.toThrow("403");
+    expect(p.youtubeStatus).toContain("API request failed");
+    expect(p.youtubeKey).toBe("saved-key");
+    await p.validateYoutube();
+    expect(p.youtubeStatus).toContain("API verified");
+  });
+  it("does not verify a replacement key from a previous key's in-flight request", async () => {
+    const p = new Providers(() => {});
+    p.youtubeKey = "old-key";
+    let complete!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(resolve => { complete = resolve; })));
+    const request = p.validateYoutube();
+    p.youtubeKey = "replacement";
+    complete(reply({ items: [] }));
+    await request;
+    expect(p.youtubeStatus).toContain("API check pending");
+  });
+});
 describe("Spotify playback acknowledgements", () => {
   const connected = () => {
     const providers = new Providers(() => {});

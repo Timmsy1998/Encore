@@ -36,6 +36,7 @@ For Encore's automatic Spotify-first chat search, actions must send the song-and
 | Bans, favourites and history | Saved between sessions; history keeps up to 1,000 songs |
 | Chat replies | Configurable format, with Twitch, YouTube and Kick targets |
 | Reconnection | Automatic reconnect with duplicate-event handling |
+| YouTube credentials | Masked saved-key indicator; configured, verified and failed API states; blank replacement retains the key; session-only storage is labelled |
 | Backups | Versioned JSON without credentials |
 | OBS | Silent browser sources with separate saved designs, gallery layouts, vinyl and YouTube Canvas artwork |
 | Resource use | Lazy provider SDKs, lightweight progress IPC, paused/idle polling suppression and bounded Spotify sampling; Windows/account endurance profiling remains unverified |

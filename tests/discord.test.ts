@@ -7,7 +7,7 @@ import { DiscordPresence, discordFrame, discordSocketPath } from "../desktop/dis
 
 const track: Track = { id: "abcdefghijk", source: "youtube", title: "A song", author: "An artist", duration: 200, user: "Private viewer" };
 function state(): Snapshot {
-  return { ...defaults(), current: track, playing: true, currentLane: "request", streamerbot: "Disconnected", youtube: "Ready", spotify: "Disconnected", error: "", logs: [], secureStorage: false, overlayUrl: "", dataPath: "", appVersion: "1.2.4", importStatus: "", progress: { position: 20, observedAt: Date.now(), active: true } };
+  return { ...defaults(), current: track, playing: true, currentLane: "request", streamerbot: "Disconnected", youtube: "Ready", youtubeConfigured: true, spotify: "Disconnected", error: "", logs: [], secureStorage: false, overlayUrl: "", dataPath: "", appVersion: "1.2.4", importStatus: "", progress: { position: 20, observedAt: Date.now(), active: true } };
 }
 class Pipe extends EventEmitter {
   writes: Buffer[] = [];
