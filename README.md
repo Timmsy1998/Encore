@@ -81,7 +81,7 @@ Enable **Settings → Discord Rich Presence → Share music on Discord** to shar
 
 Your profile shows the song, artist, Spotify/YouTube platform, artwork and a countdown once playback progress is available. **Open on Spotify/YouTube** links to that track; **Download Encore** links to the latest GitHub release. Settings includes a live preview and controls for artwork, paused tracks and the download button. Idle presence is hidden, and paused tracks are hidden by default. Requester names, queues and credentials are never included.
 
-Encore reconnects automatically when Discord restarts. Updates can take 15 seconds; the connection status in Settings reports failures. Discord controls the final appearance and button visibility. Windows Discord/account visual verification remains a release check.
+Encore reconnects automatically when Discord restarts. Presence stays visible between songs while the next update waits for the rate limit; updates can take 15 seconds. An actual pause, playback failure or empty queue still hides presence according to your settings. The connection status in Settings reports failures. Discord controls the final appearance and button visibility. Windows Discord/account visual verification remains a release check.
 
 ## Updates and settings
 

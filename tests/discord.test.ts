@@ -108,6 +108,40 @@ describe("Discord local RPC lifecycle", () => {
     snapshot.settings.discordEnabled = false; presence.update(snapshot);
     await vi.advanceTimersByTimeAsync(120000); expect(pipes).toHaveLength(11); expect(presence.status).toBe("Disabled");
   });
+  it.each([0, 20000])("keeps presence through a %s ms track change, then publishes the next song", async (transitionTime) => {
+    const { presence, snapshot, pipes } = setup(); presence.update(snapshot); const pipe = pipes[0]; pipe.ready(); pipe.ack();
+    snapshot.playing = false; presence.update(snapshot, true);
+    snapshot.current = { ...track, id: "zyxwvutsrqp", title: "Next song" };
+    snapshot.progress = null; presence.update(snapshot, true);
+    await vi.advanceTimersByTimeAsync(transitionTime);
+    expect(pipe.writes).toHaveLength(2);
+    snapshot.playing = true; presence.update(snapshot, true);
+    presence.update(snapshot);
+    if (transitionTime < 15000) {
+      expect(pipe.writes).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(15000 - transitionTime);
+    }
+    const activity = pipe.last().args.activity;
+    expect(activity.details).toBe("Next song");
+    expect(activity.buttons[0].url).toContain("zyxwvutsrqp");
+    expect(activity.assets.large_image).toContain("zyxwvutsrqp");
+    expect(activity.timestamps).toBeUndefined(); pipe.ack();
+    snapshot.progress = { position: 1, observedAt: Date.now(), active: true }; presence.update(snapshot);
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(pipe.last().args.activity.timestamps).toBeDefined(); pipe.ack(); presence.stop();
+  });
+  it.each(["failed", "empty", "disabled"] as const)("clears presence when a track transition is %s", (outcome) => {
+    const { presence, snapshot, pipes } = setup(); presence.update(snapshot); const pipe = pipes[0]; pipe.ready(); pipe.ack();
+    snapshot.playing = false; presence.update(snapshot, true);
+    expect(pipe.writes).toHaveLength(2);
+    if (outcome === "empty") snapshot.current = null;
+    if (outcome === "disabled") snapshot.settings.discordEnabled = false;
+    presence.update(snapshot, outcome === "disabled");
+    expect(pipe.last().args.activity).toBeNull();
+    if (outcome === "disabled") expect(pipe.ended).toBe(true);
+    else pipe.ack();
+    presence.stop();
+  });
   it("reconnects after Discord restarts and republishes the current track", async () => {
     const { presence, snapshot, pipes } = setup(); presence.update(snapshot); pipes[0].ready(); pipes[0].ack();
     pipes[0].destroy(); expect(presence.status).toContain("disconnected");

@@ -107,6 +107,7 @@ function snapshot(): Snapshot {
   };
 }
 let trackGeneration = 0;
+let changingTrack = false;
 let playbackSample = { generation: -1, position: 0, observedAt: 0, active: false };
 function publicState(presetId?: string) {
   const appearance = overlayAppearance(queue.state.settings, presetId);
@@ -126,7 +127,7 @@ function publicState(presetId?: string) {
 function emit() {
   placePlayer();
   const state = snapshot();
-  if (!quitting) discord?.update(state);
+  if (!quitting) discord?.update(state, changingTrack);
   if (main && !main.isDestroyed())
     main.webContents.send("encore:state", state);
   for (const client of clients) client.write("data: update\n\n");
@@ -305,12 +306,18 @@ async function start(resume = false) {
   emit();
 }
 async function advance() {
-  await pause();
-  startedKey = "";
-  queue.next();
-  queue.playing = false;
-  save();
-  await start();
+  changingTrack = true;
+  try {
+    await pause();
+    startedKey = "";
+    queue.next();
+    queue.playing = false;
+    save();
+    await start();
+  } finally {
+    changingTrack = false;
+    emit();
+  }
 }
 const EventSchema = z
   .object({
@@ -750,7 +757,7 @@ const server = createServer(async (req, res) => {
           playbackSample = { generation, position: data.position, observedAt: Date.now(), active: queue.playing && !!data.active };
           if (main && !main.isDestroyed() && main.isVisible() && !main.isMinimized())
             main.webContents.send("encore:progress", playbackSample);
-          if (!quitting) discord?.update(snapshot());
+          if (!quitting) discord?.update(snapshot(), changingTrack);
         }
       } else if (data.event === "ready" && data.device) {
         spotifyDevice = data.device;

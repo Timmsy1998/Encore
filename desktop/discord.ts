@@ -38,9 +38,12 @@ export class DiscordPresence {
     this.status = status;
     queueMicrotask(this.changed);
   }
-  update(state: Snapshot) {
+  update(state: Snapshot, changingTrack = false) {
     const id = state.settings.discordEnabled ? state.settings.discordClientId : "";
-    this.desired = discordActivity(state);
+    // Internal pause/save/reconnect snapshots are not listening-state changes.
+    // Keep the last activity until advance finishes, including slow SDK recovery.
+    // Disabling or changing the application still takes effect immediately.
+    if (!changingTrack || id !== this.clientId) this.desired = discordActivity(state);
     if (id !== this.clientId) {
       this.disconnect();
       this.clientId = id;
