@@ -2,7 +2,9 @@
 
 Spotify and YouTube play inside Encore through their official browser players. They share a queue and playback controls; switching services pauses the outgoing player before starting the next song.
 
-Spotify needs Premium, developer-app access and Widevine DRM. YouTube uses its visible video player and pauses when Encore is hidden or minimised. Reopening Encore always leaves playback paused.
+Spotify needs Premium, developer-app access and Widevine DRM. YouTube uses its embedded video player and keeps playing when Encore is minimised, including when the queue moves to the next song. Starting a song does not restore the window. Closing Encore to the tray still pauses YouTube. Relaunching Encore always leaves playback paused.
+
+The dedicated playback view remains unthrottled while minimised; the main interface skips background progress updates and refreshes when restored. Native lifecycle checks use a controlled YouTube SDK fixture; prolonged playback with real YouTube videos on Windows remains a release check.
 
 ## Connecting Spotify
 

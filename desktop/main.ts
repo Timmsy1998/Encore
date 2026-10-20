@@ -265,10 +265,6 @@ async function pause() {
 }
 async function start(resume = false) {
   if (!queue.current) return;
-  if (queue.current.source === "youtube" && main) {
-    main.show();
-    if (main.isMinimized()) main.restore();
-  }
   showPlayer();
   if (queue.current.source === "spotify") {
     let body: { uris: string[]; position_ms?: number } | undefined = resume && startedKey === key(queue.current)
@@ -923,9 +919,6 @@ function createMain() {
   };
   main.on("show", refreshWindow);
   main.on("restore", refreshWindow);
-  main.on("minimize", () => {
-    if (queue.current?.source === "youtube") void serial(pause);
-  });
   main.on("close", (event) => {
     if (main && !main.isDestroyed())
       writeFileSync(

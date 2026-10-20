@@ -223,8 +223,58 @@ try {
       expect((await window.evaluate(() => window.encore.snapshot())).playlists[0].tracks).toHaveLength(2);
       await window.getByRole("button", { name: "Remove Spotify import smoke from playlist", exact: true }).click();
       await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).base.map(t => t.source)).toEqual(["youtube"]);
+      // Exercise the real window lifecycle with a controlled official-SDK-shaped player.
+      // This verifies background timers and queue control, not real YouTube/account playback.
+      await app.context().route("https://www.youtube.com/iframe_api", route => route.fulfill({
+        contentType: "application/javascript",
+        body: `window.YT = { Player: class {
+          constructor(_, options) {
+            window.encoreSmokeYT = this;
+            this.id = ""; this.playback = 2; this.started = Date.now();
+            setTimeout(() => options.events.onReady(), 0);
+          }
+          loadVideoById(id) { this.id = id; this.playVideo(); }
+          cueVideoById(id) { this.id = id; this.pauseVideo(); }
+          playVideo() { this.playback = 1; this.started = Date.now(); }
+          pauseVideo() { this.playback = 2; }
+          setVolume() {}
+          getVideoData() { return { video_id: this.id }; }
+          getPlayerState() { return this.playback; }
+          getCurrentTime() { return (Date.now() - this.started) / 1000; }
+        }}; window.onYouTubeIframeAPIReady();`,
+      }));
+      const playerValue = expression => app.evaluate(async ({ webContents }, expression) => {
+        const player = webContents.getAllWebContents().find(contents => contents.getURL().includes("/player.html?"));
+        if (!player) throw Error("Missing playback view");
+        return player.executeJavaScript(expression);
+      }, expression);
+      const windowState = () => app.evaluate(({ BrowserWindow }) => {
+        const win = BrowserWindow.getAllWindows()[0];
+        return { minimised: win.isMinimized(), visible: win.isVisible() };
+      });
+      await window.evaluate(() => window.encore.command({ type: "play" }));
+      await expect.poll(() => playerValue("window.encoreSmokeYT?.getPlayerState()")).toBe(1);
+      await window.evaluate(() => window.encore.windowAction("minimize"));
+      await expect.poll(async () => (await windowState()).minimised).toBe(true);
+      // The unthrottled sampler must keep reporting progress to main while minimised.
+      const position = ((await window.evaluate(() => window.encore.snapshot())).progress?.position ?? 0);
+      await expect.poll(async () => ((await window.evaluate(() => window.encore.snapshot())).progress?.position ?? 0), { timeout: 10000 })
+        .toBeGreaterThan(position + 1);
+      expect((await window.evaluate(() => window.encore.snapshot())).playing).toBe(true);
+      // A provider-ended event rotates the base playlist without opening the window.
+      const generation = await playerValue("state.generation");
+      await playerValue("window.encoreSmokeYT.playback = 0");
+      await expect.poll(() => playerValue("state.generation")).toBeGreaterThan(generation);
+      await expect.poll(() => playerValue("window.encoreSmokeYT.getPlayerState()")).toBe(1);
+      expect((await windowState()).minimised).toBe(true);
+      await window.evaluate(() => window.encore.command({ type: "pause" }));
+      expect((await window.evaluate(() => window.encore.snapshot())).playing).toBe(false);
+      await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].restore());
+      expect((await window.evaluate(() => window.encore.snapshot())).playing).toBe(false);
+      expect(await playerValue("window.encoreSmokeYT.getPlayerState()")).toBe(2);
       await window.getByRole("button", { name: "Stop stream playlist", exact: true }).click();
       await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).activePlaylistId).toBeNull();
+      await window.evaluate(() => window.encore.command({ type: "skip" }));
 
     } finally {
       await app.evaluate(() => {
@@ -322,7 +372,7 @@ try {
   );
   if (!denied) throw Error("Node unexpectedly exposed in renderer");
   console.log(
-    "Electron startup, preload, empty paused state, Streamer.bot/YouTube/Spotify setup saves, authorization launch, Spotify/YouTube playlist imports, mixed stream playlist creation/activation/reorder/reload/editing, failure preservation, navigation, live OBS overlay customisation and native clipboard passed.",
+    "Electron startup, preload, empty paused state, Streamer.bot/YouTube/Spotify setup saves, authorization launch, Spotify/YouTube playlist imports, mixed stream playlist creation/activation/reorder/reload/editing, failure preservation, minimised YouTube playback/rotation and pause, navigation, live OBS overlay customisation and native clipboard passed.",
   );
 } finally {
   await app.close();
