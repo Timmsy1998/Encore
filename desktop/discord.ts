@@ -1,5 +1,5 @@
 import { createConnection, type Socket } from "node:net";
-import { join } from "node:path";
+import { posix } from "node:path";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { discordActivity, type DiscordActivity } from "../src/core/discord";
@@ -8,7 +8,7 @@ import type { Snapshot } from "../src/core/contracts";
 const Message = z.object({ cmd: z.string().optional(), evt: z.string().nullable().optional(), nonce: z.string().nullable().optional() });
 export function discordSocketPath(index: number, platform = process.platform, env = process.env) {
   return platform === "win32" ? `\\\\?\\pipe\\discord-ipc-${index}`
-    : join(env.XDG_RUNTIME_DIR || env.TMPDIR || env.TMP || env.TEMP || "/tmp", `discord-ipc-${index}`);
+    : posix.join(env.XDG_RUNTIME_DIR || env.TMPDIR || env.TMP || env.TEMP || "/tmp", `discord-ipc-${index}`);
 }
 export function discordFrame(opcode: number, payload: unknown) {
   const body = Buffer.from(JSON.stringify(payload));
