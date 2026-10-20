@@ -748,6 +748,7 @@ const server = createServer(async (req, res) => {
             .regex(/^[a-zA-Z0-9_-]{1,128}$/)
             .optional(),
           message: z.string().max(200).optional(),
+          youtubeError: z.number().int().min(0).max(1000).optional(),
           position: z.number().min(0).max(86400).optional(),
           active: z.boolean().optional(),
         })
@@ -782,7 +783,16 @@ const server = createServer(async (req, res) => {
             !queue.playing
           )
             return;
-          if (data.event === "ended") await advance();
+          if (data.event === "error" && queue.current.source === "youtube" &&
+              (data.youtubeError === 101 || data.youtubeError === 150)) {
+            error = `Skipped YouTube video: embedded playback restricted (error ${data.youtubeError}).`;
+            logs.unshift(new Date().toISOString() + " " + error);
+            logs.splice(100);
+            // Keep saved playlists intact, but don't rotate straight back into a blocked video.
+            const blocked = key(queue.current);
+            queue.state.base = queue.state.base.filter(track => key(track) !== blocked);
+            await advance();
+          } else if (data.event === "ended") await advance();
           else {
             await pause();
             error =

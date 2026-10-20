@@ -157,7 +157,7 @@ try {
           if (address.searchParams.get("playlistId") === "PLmissing000") { body = {}; status = 404; }
           else body = { items: [{ contentDetails: { videoId: "abcdefghijk" } }] };
         } else if (address.hostname === "www.googleapis.com" && address.pathname.endsWith("/videos"))
-          body = { items: [{ id: "abcdefghijk", status: { embeddable: true }, snippet: { title: "YouTube import smoke", channelTitle: "Fixture" }, contentDetails: { duration: "PT3M" } }] };
+          body = { items: [{ id: address.searchParams.get("id") || "abcdefghijk", status: { embeddable: true }, snippet: { title: "YouTube import smoke", channelTitle: "Fixture" }, contentDetails: { duration: "PT3M" } }] };
         else return globalThis.encoreSmokeFetch(url, init);
         return new Response(JSON.stringify(body), { status });
       };
@@ -230,6 +230,7 @@ try {
         body: `window.YT = { Player: class {
           constructor(_, options) {
             window.encoreSmokeYT = this;
+            this.events = options.events;
             this.id = ""; this.playback = 2; this.started = Date.now();
             setTimeout(() => options.events.onReady(), 0);
           }
@@ -267,11 +268,28 @@ try {
       await expect.poll(() => playerValue("state.generation")).toBeGreaterThan(generation);
       await expect.poll(() => playerValue("window.encoreSmokeYT.getPlayerState()")).toBe(1);
       expect((await windowState()).minimised).toBe(true);
+      // Restricted embeds skip once through main, even with duplicate provider errors.
+      await window.evaluate(() => window.encore.command({ type: "listen", input: "https://www.youtube.com/watch?v=zyxwvutsrqp" }));
+      const blockedGeneration = await playerValue("state.generation");
+      await playerValue("window.encoreSmokeYT.events.onError({ data: 150 }); window.encoreSmokeYT.events.onError({ data: 150 })");
+      await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).current?.id).toBe("zyxwvutsrqp");
+      await expect.poll(() => playerValue("state.generation")).toBe(blockedGeneration + 1);
+      const skipped = await window.evaluate(() => window.encore.snapshot());
+      expect(skipped.playing).toBe(true);
+      expect(skipped.base).toHaveLength(0);
+      expect(skipped.playlists.find(p => p.id === skipped.activePlaylistId).tracks).toHaveLength(1);
+      expect(skipped.error).toContain("Skipped YouTube");
+      expect((await windowState()).minimised).toBe(true);
       await window.evaluate(() => window.encore.command({ type: "pause" }));
       expect((await window.evaluate(() => window.encore.snapshot())).playing).toBe(false);
       await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].restore());
       expect((await window.evaluate(() => window.encore.snapshot())).playing).toBe(false);
       expect(await playerValue("window.encoreSmokeYT.getPlayerState()")).toBe(2);
+      await window.evaluate(() => window.encore.command({ type: "play" }));
+      await expect.poll(() => playerValue("window.encoreSmokeYT.getPlayerState()")).toBe(1);
+      await playerValue("window.encoreSmokeYT.events.onError({ data: 101 })");
+      await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).current).toBeNull();
+      expect((await window.evaluate(() => window.encore.snapshot())).playing).toBe(false);
       await window.getByRole("button", { name: "Stop stream playlist", exact: true }).click();
       await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).activePlaylistId).toBeNull();
       await window.evaluate(() => window.encore.command({ type: "skip" }));

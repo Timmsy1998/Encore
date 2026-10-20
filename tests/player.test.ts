@@ -227,6 +227,27 @@ it("recovers a missed YouTube end event and reports each rotation only once", as
   expect(p.events.filter(e => e.event === "ended")).toHaveLength(2);
 });
 
+it.each([101, 150, 153])("reports YouTube error %s with the current playback identity", async (code) => {
+  const p = await player();
+  p.youtubeEvents.onError({ data: code });
+  await p.flush();
+  expect(p.events.filter(e => e.event === "error")).toEqual([
+    expect.objectContaining({ key: "youtube:youtube001", generation: 1, youtubeError: code }),
+  ]);
+});
+
+it("ignores YouTube errors from a different video or while paused", async () => {
+  const p = await player();
+  p.yt.getVideoData.mockReturnValue({ video_id: "previous001" });
+  p.youtubeEvents.onError({ data: 150 });
+  await p.change({ current: { source: "youtube", id: "youtube001" }, playing: false,
+    generation: 2, trackGeneration: 1, volume: 70, spotifyConnected: true });
+  p.yt.getVideoData.mockReturnValue({ video_id: "youtube001" });
+  p.youtubeEvents.onError({ data: 150 });
+  await p.flush();
+  expect(p.events.filter(e => e.event === "error")).toHaveLength(0);
+});
+
 it("does not treat paused, buffering, cued or stale YouTube samples as endings", async () => {
   const p = await player();
   for (const value of [-1, 1, 2, 3, 5]) {

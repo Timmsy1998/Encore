@@ -114,14 +114,15 @@ window.onYouTubeIframeAPIReady = () => {
         report("error", { message: status.textContent });
       },
       onError: (event) => {
+        if (state?.current?.source !== "youtube" || !state.playing ||
+            ytKey !== "youtube:" + state.current.id + ":" + state.trackGeneration) return;
+        const videoId = yt.getVideoData().video_id;
+        if (videoId && videoId !== state.current.id) return;
         status.textContent = "YouTube error " + event.data;
-        if (state?.current?.source === "youtube")
-          report("error", {
-            message:
-              "YouTube error " +
-              event.data +
-              ". This video may restrict embedded playback. Skip or try another video.",
-          });
+        report("error", {
+          youtubeError: event.data,
+          message: "YouTube error " + event.data + ". This video may restrict embedded playback. Skip or try another video.",
+        });
       },
     },
   });
