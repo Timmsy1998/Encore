@@ -186,3 +186,32 @@ describe("trust boundaries and migration", () => {
     expect(safeMessage(Error("token=secret"))).not.toContain("secret");
   });
 });
+
+describe("playback history", () => {
+  it("migrates older states without inventing plays from accepted requests", () => {
+    const old: Partial<ReturnType<typeof defaults>> = defaults();
+    delete old.playbackHistory;
+    old.history = [track()];
+    expect(migrate(old).playbackHistory).toEqual([]);
+  });
+  it("records every rotation, with outcomes, reasons and durable metadata", () => {
+    const q = new Queue();
+    q.recordPlayback("manual");
+    expect(q.state.playbackHistory).toEqual([]);
+    q.listen(track());
+    expect(q.state.playbackHistory).toEqual([]);
+    q.next();
+    for (const reason of ["finished", "manual", "votes", "banned", "youtube-101", "youtube-150"] as const) q.recordPlayback(reason);
+    const restored = migrate(q.persisted()).playbackHistory;
+    expect(restored.map(entry => entry.reason)).toEqual(["youtube-150", "youtube-101", "banned", "votes", "manual", "finished"]);
+    expect(restored.map(entry => entry.outcome)).toEqual(["skipped", "skipped", "skipped", "skipped", "skipped", "completed"]);
+    expect(new Set(restored.map(entry => entry.id)).size).toBe(6);
+    expect(restored.every(entry => entry.track.title === track().title && Number.isFinite(Date.parse(entry.endedAt)))).toBe(true);
+  });
+  it("bounds storage to the latest 1000 plays", () => {
+    const q = new Queue();
+    q.listen(track()); q.next();
+    for (let i = 0; i < 1005; i++) q.recordPlayback("finished");
+    expect(q.state.playbackHistory).toHaveLength(1000);
+  });
+});

@@ -305,10 +305,11 @@ async function start(resume = false) {
   queue.playing = true;
   emit();
 }
-async function advance() {
+async function advance(reason: Parameters<Queue["recordPlayback"]>[0] = "manual") {
   changingTrack = true;
   try {
     await pause();
+    queue.recordPlayback(reason);
     startedKey = "";
     queue.next();
     queue.playing = false;
@@ -395,7 +396,7 @@ async function event(input: unknown) {
         await advance();
         break;
       case "VOTE_SKIP":
-        if (queue.current && queue.vote(e.user)) await advance();
+        if (queue.current && queue.vote(e.user)) await advance("votes");
         break;
       case "WRONG_SONG":
         queue.wrong(e.user);
@@ -533,6 +534,7 @@ async function command(c: Command) {
           ...queue.state.listening,
           ...queue.state.queue,
           ...queue.state.history,
+          ...queue.state.playbackHistory.map(entry => entry.track),
           ...queue.state.base,
           ...(queue.current ? [queue.current] : []),
         ].find((t) => key(t) === c.key);
@@ -541,7 +543,7 @@ async function command(c: Command) {
       break;
     }
     case "readd": {
-      const t = [...queue.state.favorites, ...queue.state.history].find(
+      const t = [...queue.state.favorites, ...queue.state.history, ...queue.state.playbackHistory.map(entry => entry.track)].find(
         (t) => key(t) === c.key,
       );
       if (t) queue.add({ ...t, user: "Streamer" });
@@ -549,7 +551,7 @@ async function command(c: Command) {
     }
     case "ban":
       queue.ban(c.key);
-      if (queue.current && key(queue.current) === c.key) await advance();
+      if (queue.current && key(queue.current) === c.key) await advance("banned");
       break;
     case "unban":
       queue.state.banned = queue.state.banned.filter((k) => k !== c.key);
@@ -791,8 +793,8 @@ const server = createServer(async (req, res) => {
             // Keep saved playlists intact, but don't rotate straight back into a blocked video.
             const blocked = key(queue.current);
             queue.state.base = queue.state.base.filter(track => key(track) !== blocked);
-            await advance();
-          } else if (data.event === "ended") await advance();
+            await advance(data.youtubeError === 101 ? "youtube-101" : "youtube-150");
+          } else if (data.event === "ended") await advance("finished");
           else {
             await pause();
             error =

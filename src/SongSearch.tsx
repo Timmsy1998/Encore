@@ -4,11 +4,12 @@ import { Button } from "./components/ui/button";
 import { Cover, Provider, time } from "./Playback";
 import { key, type SongSearchResult, type Track } from "./core/contracts";
 
-export function SongSearch({ label, busy, add, children }: {
+export function SongSearch({ label, busy, add, children, initialQuery = "", excludeKey }: {
   label: string; busy: boolean; add: (input: string) => Promise<boolean>;
+  initialQuery?: string; excludeKey?: string;
   children?: (input: string, clear: () => void) => ReactNode;
 }) {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialQuery);
   const [result, setResult] = useState<SongSearchResult>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -16,6 +17,18 @@ export function SongSearch({ label, busy, add, children }: {
   const [added, setAdded] = useState<string[]>([]);
   const revision = useRef(0);
   useEffect(() => () => { revision.current++; }, []);
+  useEffect(() => {
+    if (!initialQuery) return;
+    const current = ++revision.current;
+    setLoading(true);
+    window.encore.searchSongs(initialQuery).then(found => {
+      if (current === revision.current) setResult(found);
+    }).catch(cause => {
+      if (current === revision.current) setError(cause instanceof Error ? cause.message : "Search failed. Try again.");
+    }).finally(() => { if (current === revision.current) setLoading(false); });
+    return () => { revision.current++; };
+  }, [initialQuery]);
+  const tracks = result?.tracks.filter(track => key(track) !== excludeKey) ?? [];
   function clear() {
     revision.current++;
     setInput(""); setResult(undefined); setError(""); setLoading(false); setAdded([]);
@@ -59,9 +72,9 @@ export function SongSearch({ label, busy, add, children }: {
     {loading && <p role="status">Searching Spotify and YouTube…</p>}
     {error && <p role="alert">{error}</p>}
     {result && <div className="song-search-results">
-      <div className="list-toolbar"><span role="status">{result.tracks.length ? `${result.tracks.length} results · Choose songs to add` : "No songs found. Try another song or artist."}</span><Button variant="ghost" onClick={clear}>Close results</Button></div>
+      <div className="list-toolbar"><span role="status">{tracks.length ? `${tracks.length} results · Choose songs to add` : "No songs found. Try another song or artist."}</span><Button variant="ghost" onClick={clear}>Close results</Button></div>
       {result.warnings.map(warning => <p className="notice" role="status" key={warning}>{warning}</p>)}
-      <ul aria-label="Song search results">{result.tracks.map(track => <li key={key(track)}>
+      <ul aria-label="Song search results">{tracks.map(track => <li key={key(track)}>
         <Cover track={track} />
         <div className="song-search-title"><strong>{track.title}</strong><span>{track.author}</span><Provider source={track.source} /></div>
         <span className="duration">{time(track.duration)}</span>

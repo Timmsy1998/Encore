@@ -90,6 +90,14 @@ export const PlaylistSchema = z.object({
   name: z.string().trim().min(1).max(80),
   tracks: z.array(TrackSchema).max(10000),
 });
+export const PlaybackEntrySchema = z.object({
+  id: z.uuid(),
+  track: TrackSchema,
+  endedAt: z.iso.datetime(),
+  outcome: z.enum(["completed", "skipped"]),
+  reason: z.enum(["finished", "manual", "votes", "banned", "youtube-101", "youtube-150"]),
+});
+export type PlaybackEntry = z.infer<typeof PlaybackEntrySchema>;
 export const StateSchema = z.object({
   version: z.literal(1),
   settings: SettingsSchema,
@@ -111,6 +119,7 @@ export const StateSchema = z.object({
   base: z.array(TrackSchema).max(10000),
   favorites: z.array(TrackSchema).max(10000),
   history: z.array(TrackSchema).max(1000),
+  playbackHistory: z.array(PlaybackEntrySchema).max(1000).default([]),
   banned: z.array(z.string().max(100)).max(10000),
 }).refine(state => state.activePlaylistId === null || state.playlists.some(item => item.id === state.activePlaylistId), "Active playlist must exist in the library");
 export type SavedState = z.infer<typeof StateSchema>;
@@ -237,6 +246,7 @@ export function defaults(): SavedState {
     baseShuffle: false,
     favorites: [],
     history: [],
+    playbackHistory: [],
     banned: [],
     listening: [],
     resume: null,

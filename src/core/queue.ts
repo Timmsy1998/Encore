@@ -1,4 +1,4 @@
-import { defaults, key, type SavedState, type Track } from "./contracts";
+import { defaults, key, type SavedState, type Track, type PlaybackEntry } from "./contracts";
 export class Queue {
   state: SavedState;
   current: Track | null = null;
@@ -69,6 +69,16 @@ export class Queue {
       ...this.state.history.filter((t) => key(t) !== key(track)),
     ].slice(0, 1000);
     return true;
+  }
+  recordPlayback(reason: PlaybackEntry["reason"]) {
+    if (!this.current) return;
+    const entry: PlaybackEntry = {
+      id: crypto.randomUUID(), track: { ...this.current },
+      endedAt: new Date().toISOString(),
+      outcome: reason === "finished" ? "completed" : "skipped",
+      reason,
+    };
+    this.state.playbackHistory = [entry, ...this.state.playbackHistory].slice(0, 1000);
   }
   setRepeatBase(enabled: boolean) {
     if (enabled === this.state.settings.repeatBase) return;

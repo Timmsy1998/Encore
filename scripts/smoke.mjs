@@ -279,6 +279,9 @@ try {
       expect(skipped.base).toHaveLength(0);
       expect(skipped.playlists.find(p => p.id === skipped.activePlaylistId).tracks).toHaveLength(1);
       expect(skipped.error).toContain("Skipped YouTube");
+      expect(skipped.playbackHistory[0].reason).toBe("youtube-150");
+      expect(skipped.playbackHistory.filter(entry => entry.reason === "youtube-150")).toHaveLength(1);
+      expect(skipped.playbackHistory.some(entry => entry.reason === "finished")).toBe(true);
       expect((await windowState()).minimised).toBe(true);
       await window.evaluate(() => window.encore.command({ type: "pause" }));
       expect((await window.evaluate(() => window.encore.snapshot())).playing).toBe(false);
@@ -290,6 +293,12 @@ try {
       await playerValue("window.encoreSmokeYT.events.onError({ data: 101 })");
       await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).current).toBeNull();
       expect((await window.evaluate(() => window.encore.snapshot())).playing).toBe(false);
+      expect((await window.evaluate(() => window.encore.snapshot())).playbackHistory[0].reason).toBe("youtube-101");
+      await window.getByRole("button", { name: "History", exact: true }).click();
+      await expect(window.getByText("YouTube blocked embedded playback (101)", { exact: true })).toBeVisible();
+      await window.reload();
+      await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).playbackHistory[0].reason).toBe("youtube-101");
+      await window.getByRole("button", { name: "Playlists", exact: true }).click();
       await window.getByRole("button", { name: "Stop stream playlist", exact: true }).click();
       await expect.poll(async () => (await window.evaluate(() => window.encore.snapshot())).activePlaylistId).toBeNull();
       await window.evaluate(() => window.encore.command({ type: "skip" }));

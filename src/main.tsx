@@ -34,6 +34,7 @@ import { Button } from "./components/ui/button";
 import { Playback, Cover, Provider, Timeline, artwork, time } from "./Playback";
 import { DiscordSettings } from "./DiscordSettings";
 import { WindowChrome } from "./WindowChrome";
+import { PlaybackHistory, songLink } from "./PlaybackHistory";
 import { SongSearch } from "./SongSearch";
 import { PlaylistLibrary } from "./PlaylistLibrary";
 import {
@@ -140,6 +141,13 @@ function App() {
     [importingPlaylist, setImportingPlaylist] = useState(false),
     [playlistResult, setPlaylistResult] = useState(""),
     [drag, setDrag] = useState<number>();
+  const [alternative, setAlternative] = useState<Track | null>(null);
+  const alternativePanel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!alternative) return;
+    alternativePanel.current?.scrollIntoView({ block: "start" });
+    alternativePanel.current?.querySelector("input")?.focus({ preventScroll: true });
+  }, [alternative]);
   const [queueFilter, setQueueFilter] = useState("All");
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   useEffect(() => {
@@ -683,8 +691,15 @@ function App() {
           {(s.error || localError) && (
             <div className="alert" role="alert">
               {localError || s.error}
+              {s.playbackHistory[0]?.reason.startsWith("youtube-") && <Button variant="ghost" onClick={() => setAlternative(s.playbackHistory[0].track)}>Find another version</Button>}
             </div>
           )}
+          {page === "Listening" && s.current && <Button variant="ghost" onClick={() => setAlternative(s.current)}>Find another version of the current song</Button>}
+          {alternative && <section ref={alternativePanel} className="section alternative-search" aria-label="Find another version">
+            <div className="list-toolbar"><h2>Another version of {alternative.title}</h2><Button variant="ghost" onClick={() => setAlternative(null)}>Close alternative search</Button></div>
+            <p>Choose a recording from Spotify or YouTube to add to personal listening. The original recording is excluded.</p>
+            <SongSearch key={key(alternative)} label="Alternative song search" initialQuery={`${alternative.title} ${alternative.author}`.trim().slice(0, 1000)} excludeKey={key(alternative)} busy={busy} add={input => send({ type: "listen", input })} />
+          </section>}
           {s.updateReady && (
             <div className="notice" role="status">
               <p>{s.updateStatus}</p>
@@ -708,7 +723,7 @@ function App() {
                         ? "Music for you, with or without Streamer.bot."
                         : page === "Favourites"
                           ? "Keep the good ones close."
-                          : "Recently accepted requests, ready to revisit."}
+                          : "Completed and skipped songs, with a reason for every skip."}
                   </p>
                 </div>
                 <span className="count">
@@ -718,7 +733,7 @@ function App() {
                       ? s.listening.length
                       : page === "Favourites"
                         ? s.favorites.length
-                        : s.history.length}{" "}
+                        : s.playbackHistory.length}{" "}
                   tracks
                 </span>
               </div>
@@ -730,6 +745,7 @@ function App() {
                 <input type="search" aria-label="Filter tracks" placeholder="Filter tracks" value={search} onChange={e => setSearch(e.target.value)} />
               </div>
               {page === "Queue" && <div className="queue-summary"><span>{s.queue.length + s.listening.length + upcomingBase.length} tracks · {time([...s.queue, ...s.listening, ...upcomingBase].reduce((n, t) => n + t.duration, 0))}</span><small>Requests first · current song finishes before the next request</small></div>}
+              {page === "History" ? <PlaybackHistory entries={s.playbackHistory} search={search} busy={busy} find={setAlternative} replay={track => void send({ type: "listen", input: songLink(track) })} /> : <>
               <div className="track-columns" aria-hidden="true"><span>#</span><span>Track</span><span>Requested by</span><span>Source</span><span>Duration</span><span /></div>
               {(page !== "Queue" || queueFilter === "All" || queueFilter === "Requests") && rows(
                 page === "Queue"
@@ -745,6 +761,7 @@ function App() {
                     ? "listening"
                     : "saved",
               )}
+              </>}
               {page === "Queue" && <>
                 {(queueFilter === "All" || queueFilter === "Listening") && <section className="section queue-lane" aria-label="Personal listening up next">
                   <h2>Personal listening <span className="count">{s.listening.length} tracks</span></h2>

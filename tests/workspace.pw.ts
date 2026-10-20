@@ -683,3 +683,44 @@ test("custom chrome sends window actions and follows native maximise state", asy
   expect(await controls.evaluate(el => getComputedStyle(el).getPropertyValue("-webkit-app-region"))).toBe("no-drag");
   expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
 });
+
+test("playback history shows skip reasons and searches alternative versions without adding automatically", async ({ page }) => {
+  await boot(page);
+  const initial = await page.evaluate(() => window.encore.snapshot());
+  initial.playbackHistory = [
+    { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", track: { id: "video000001", source: "youtube", title: "Original song", author: "Artist", duration: 180, user: "Viewer" }, endedAt: "2026-10-20T12:00:00.000Z", outcome: "skipped", reason: "youtube-150" },
+    { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", track: { id: "b".repeat(22), source: "spotify", title: "Finished song", author: "Artist", duration: 180, user: "Streamer" }, endedAt: "2026-10-20T11:00:00.000Z", outcome: "completed", reason: "finished" },
+  ];
+  await page.evaluate(state => localStorage.setItem("fixture-state", JSON.stringify(state)), initial);
+  await page.reload();
+  await page.evaluate(() => {
+    window.encore.searchSongs = async query => {
+      localStorage.setItem("alternative-query", query);
+      return { tracks: [
+        { id: "video000001", source: "youtube", title: "Original song", author: "Artist", duration: 180, user: "Streamer" },
+        { id: "video000002", source: "youtube", title: "Alternative song", author: "Artist", duration: 180, user: "Streamer" },
+        { id: "c".repeat(22), source: "spotify", title: "Spotify version", author: "Artist", duration: 180, user: "Streamer" },
+      ], warnings: [] };
+    };
+    window.encore.command = async command => { localStorage.setItem("selected-song", JSON.stringify(command)); };
+  });
+  await page.getByRole("button", { name: "History", exact: true }).click();
+  await expect(page.getByText("YouTube blocked embedded playback (150)", { exact: true })).toBeVisible();
+  await expect(page.getByText("Played to the end", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Skipped", exact: true }).click();
+  await expect(page.getByText("Finished song", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Find another version", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Alternative song search", exact: true })).toBeFocused();
+  const results = page.getByRole("list", { name: "Song search results" });
+  await expect(results.getByText("Alternative song", { exact: true })).toBeVisible();
+  await expect(results.getByText("Spotify version", { exact: true })).toBeVisible();
+  await expect(results.getByText("Original song", { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("alternative-query"))).toBe("Original song Artist");
+  expect(await page.evaluate(() => localStorage.getItem("selected-song"))).toBeNull();
+  await results.getByRole("button", { name: "Add Alternative song from YouTube", exact: true }).click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("selected-song")!))).toEqual({ type: "listen", input: "https://www.youtube.com/watch?v=video000002" });
+  await page.getByRole("button", { name: "Close alternative search", exact: true }).click();
+  await page.getByRole("button", { name: "Queue again: Original song", exact: true }).click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("selected-song")!))).toEqual({ type: "listen", input: "https://www.youtube.com/watch?v=video000001" });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

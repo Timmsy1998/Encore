@@ -1036,3 +1036,14 @@ h1 { font-size: 32px; font-weight: 700; margin: 0 0 3px; line-height: 1.2; lette
 .window-error { flex-shrink: 0; padding: 6px 14px; color: #f5b66f; background: #33291e; font-size: 12px; }
 @media (max-width: 850px) { .window-caption { display: none; } }
 @media (prefers-reduced-motion: reduce) { .window-controls button { transition: none; } }
+
+.playback-history { list-style: none; padding: 0; margin: 16px 0; }
+.playback-history li { display: flex; align-items: center; gap: 16px; padding: 16px 4px; border-bottom: 1px solid var(--border, #303139); }
+.history-description { display: flex; flex: 1; flex-direction: column; gap: 5px; min-width: 0; }
+.history-description strong { overflow-wrap: anywhere; }
+.history-description > span, .history-description time { color: var(--muted, #a8a8b1); font-size: 12px; }
+.history-description .provider { align-self: flex-start; }
+.history-skipped { color: var(--accent, #e5aa73); }
+.history-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 220px; }
+.alternative-search { border: 1px solid var(--accent, #e5aa73); }
+@media (max-width: 1050px) { .playback-history li { flex-wrap: wrap; } .history-actions { width: 100%; max-width: none; justify-content: flex-start; } }

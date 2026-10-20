@@ -76,3 +76,9 @@ The bottom transport provides play/pause, restart track, skip, favourite, volume
 Shuffle changes the upcoming stream playlist copy without changing saved songs or the current track. Turning it off restores saved order for a named playlist; direct URL imports retain their current order. Repeat is enabled by default. Turning it off removes the current base track from the rotation and lets remaining songs finish once. Requests and personal listening are never repeated. Reopening remains paused and restores an interrupted single-pass track.
 
 The redesigned workspace is checked in browser fixtures at 1440 × 900, 900 × 700 and 760 × 600. Real-account Spotify DRM playback and native YouTube placement on Windows still require Windows/account verification.
+
+## Playback history and alternative versions
+
+History records the latest 1,000 completed or skipped plays locally, including repeated playlist rotations, time, provider and requester. Skip reasons distinguish manual skips, viewer votes, bans and YouTube embedding restrictions (101/150). Pausing does not create a completed play. Older accepted-request history is preserved internally, but is not presented as actual playback history. Existing backups load with an empty playback log; new backups include it.
+
+Use **Find another version** on a history entry, on a restricted-video error, or for the current song on Listening. Encore searches Spotify and YouTube using the song title and artist, excluding the original provider recording. Results retain platform labels, loading/errors and provider warnings. Edit the query if the title includes video-specific text. Choosing a result adds it to personal listening; no replacement is selected automatically and the current song finishes first. **Queue again** replays the original through the same personal listening queue. Bans and provider availability still apply.
