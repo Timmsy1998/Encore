@@ -37,6 +37,7 @@ For Encore's automatic Spotify-first chat search, actions must send the song-and
 | Reconnection | Automatic reconnect with duplicate-event handling |
 | Backups | Versioned JSON without credentials |
 | OBS | Silent browser sources with separate saved designs, gallery layouts, vinyl and YouTube Canvas artwork |
+| Discord | Opt-in rich presence with track artwork, provider link, countdown and latest-release button; automatic reconnect (Windows/account visual verification remains unverified) |
 | Updates | Automatic for installed Windows copies; manual for portable copies |
 | Languages | Desktop interface is English only |
 

@@ -10,6 +10,8 @@ Encore has three parts: the Electron main process, the React interface and a sep
 | `src/core/playlists.ts` | Saved mixed-provider playlists |
 | `src/core/contracts.ts` | Shared types and Zod validation |
 | `desktop/providers.ts` | Provider metadata, Spotify login and token refresh |
+| `desktop/discord.ts` | Main-owned Discord IPC lifecycle, acknowledgements and reconnect |
+| `src/core/discord.ts` | Privacy-aware activity payload and validated provider artwork/links |
 | `desktop/streamerbot.ts` | Streamer.bot connection and events |
 | `desktop/compatibility.ts` | Upstream action compatibility |
 | `desktop/store.ts` | Settings storage and recovery |
@@ -36,6 +38,8 @@ Credentials use Electron's `safeStorage`. Linux's plaintext backend is rejected;
 ## Connections and updates
 
 Streamer.bot reconnects with backoff and subscribes once per connection. Shutdown closes sockets, timers, player connections and overlay event streams.
+
+Discord Rich Presence is opt-in. Main connects as a client to Discord’s native local IPC pipes using the [documented RPC protocol](https://discord.com/developers/docs/topics/rpc), without tokens or an extra server. Framed input is size bounded and validated; connection/acknowledgement deadlines, coalesced updates and bounded reconnect backoff handle Discord restarts. Only current-song public metadata is sent. Idle/paused hiding and disconnect clear activity; shutdown closes the socket. React only renders the status/preview and changes typed settings. Real Discord rendering and Windows pipe verification remain release checks.
 
 Installed copies use `electron-updater` with the public GitHub repository. Downloads are checked against release metadata and installed when the user chooses **Restart and install**. Update downloads run separately from playback commands. Portable copies are updated manually.
 

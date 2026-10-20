@@ -533,3 +533,37 @@ test("search shows loading, empty and partial failures and discards stale result
   await expect(page.getByText("No songs found. Try another song or artist.")).toBeVisible();
   await expect(page.getByText("YouTube: Quota exhausted.")).toBeVisible();
 });
+
+test("Discord presence is opt-in with a live preview, privacy controls and validated application ID", async ({ page }, testInfo) => {
+  await boot(page);
+  await page.evaluate(async () => {
+    const state = await window.encore.snapshot();
+    state.current = { id: "abcdefghijk", source: "youtube", title: "Presence song", author: "Presence artist", duration: 210, user: "Private requester" };
+    state.playing = true;
+    state.progress = { position: 30, observedAt: Date.now(), active: true };
+    localStorage.setItem("fixture-state", JSON.stringify(state));
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const section = page.getByRole("region", { name: "Discord Rich Presence", exact: true });
+  const preview = section.getByLabel("Discord presence preview");
+  await expect(section.getByRole("switch", { name: "Share music on Discord" })).not.toBeChecked();
+  await expect(preview).toContainText("Your music, when you choose");
+  await section.getByRole("switch", { name: "Share music on Discord" }).click();
+  await expect(preview).toContainText("Presence song");
+  await expect(preview).toContainText("Open on YouTube");
+  await expect(preview).toContainText("Download Encore");
+  await expect(preview).not.toContainText("Private requester");
+  await page.screenshot({ path: `test-results/discord-presence-${testInfo.project.name}.png`, fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await section.getByRole("switch", { name: "Include Download Encore button" }).click();
+  await expect(preview).not.toContainText("Download Encore");
+  await section.getByText("Application settings", { exact: true }).click();
+  const id = section.getByRole("textbox", { name: "Discord application ID" });
+  await expect(id).toHaveValue("1562085890510159892");
+  await id.fill("invalid"); await expect(section.getByRole("button", { name: "Save application ID" })).toBeDisabled();
+  await id.fill("123456789012345678"); await section.getByRole("button", { name: "Save application ID" }).click();
+  await page.reload();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(section.getByRole("switch", { name: "Share music on Discord" })).toBeChecked();
+});

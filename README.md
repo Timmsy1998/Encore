@@ -75,6 +75,14 @@ Overlays update live, with animated equalizer bars and transitions between songs
 
 **Overlays are visual only.** Capture Encore's application audio in OBS for both services, and avoid capturing it a second time through Desktop Audio. Encore must stay running for the overlays to work.
 
+## Discord Rich Presence
+
+Enable **Settings → Discord Rich Presence → Share music on Discord** to share your current song. Encore uses application ID `1562085890510159892`; no Discord token or login is required. Keep the Discord desktop app running and enable activity sharing in Discord.
+
+Your profile shows the song, artist, Spotify/YouTube platform, artwork and a countdown once playback progress is available. **Open on Spotify/YouTube** links to that track; **Download Encore** links to the latest GitHub release. Settings includes a live preview and controls for artwork, paused tracks and the download button. Idle presence is hidden, and paused tracks are hidden by default. Requester names, queues and credentials are never included.
+
+Encore reconnects automatically when Discord restarts. Updates can take 15 seconds; the connection status in Settings reports failures. Discord controls the final appearance and button visibility. Windows Discord/account visual verification remains a release check.
+
 ## Updates and settings
 
 Installed copies check for stable GitHub releases on startup and every six hours. Updates download in the background; choose **Restart and install** when you're ready. You can also check manually from About.

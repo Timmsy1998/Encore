@@ -24,6 +24,8 @@ node scripts/release.mjs
 
 Desktop smoke tests need a graphical session. For manual package checks, try installation and removal, the portable data folder, Spotify/YouTube switching, queued requests, OBS audio capture and reopening with playback paused. Automated tests use controlled provider responses, so they don't replace listening to the packaged app.
 
+With Discord desktop running on Windows, enable Rich Presence and verify both providers: title, artist, artwork, countdown, song link and latest-release button from another account. Check paused/idle hiding, disabling sharing, closing to tray and reconnecting after Discord restarts. Confirm the application ID and public image URLs render correctly; automated protocol tests do not verify Discord's profile rendering.
+
 ## Signing
 
 Add these repository secrets for the release workflow:

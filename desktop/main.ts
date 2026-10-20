@@ -1,6 +1,7 @@
 import * as electron from "electron";
 import { autoUpdater } from "electron-updater";
 import { Updates } from "./updates";
+import { DiscordPresence } from "./discord";
 import {
   app,
   BrowserWindow,
@@ -61,6 +62,7 @@ let secure = false,
   error = "",
   importStatus = "Not checked";
 let updates: Updates | undefined;
+let discord: DiscordPresence | undefined;
 const logs: string[] = [];
 const clients = new Set<ServerResponse>();
 const playerToken = randomBytes(32).toString("hex");
@@ -98,6 +100,7 @@ function snapshot(): Snapshot {
     dataPath: store.directory,
     appVersion: app.getVersion(),
     importStatus,
+    discordStatus: discord?.status ?? "Disabled",
     updateStatus: updates?.status,
     updateReady: updates?.ready ?? false,
   };
@@ -121,6 +124,7 @@ function publicState(presetId?: string) {
 }
 function emit() {
   placePlayer();
+  if (!quitting) discord?.update(snapshot());
   if (main && !main.isDestroyed())
     main.webContents.send("encore:state", snapshot());
   for (const client of clients) client.write("data: update\n\n");
@@ -973,6 +977,8 @@ if (!app.requestSingleInstanceLock()) {
       queue = new Queue(store.load());
       providers = new Providers(() => persistSecrets());
       providers.clientId = queue.state.settings.clientId;
+      discord = new DiscordPresence(emit);
+      discord.update(snapshot());
       secure =
         safeStorage.isEncryptionAvailable() &&
         (process.platform !== "linux" ||
@@ -1104,6 +1110,7 @@ app.on("before-quit", () => {
   quitting = true;
   clearInterval(heartbeat);
   updates?.stop();
+  discord?.stop();
   bot?.close();
   player?.webContents.close();
   for (const c of clients) c.end();

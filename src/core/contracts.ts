@@ -53,6 +53,11 @@ export const SettingsSchema = z.object({
   globalLimit: z.number().int().min(1).max(10000).default(100),
   maxMinutes: z.number().int().min(1).max(1440).default(15),
   votes: z.number().int().min(1).max(1000).default(5),
+  discordEnabled: z.boolean().default(false),
+  discordClientId: z.string().regex(/^[0-9]{17,20}$/).default("1562085890510159892"),
+  discordShowPaused: z.boolean().default(false),
+  discordArtwork: z.boolean().default(true),
+  discordDownloadButton: z.boolean().default(true),
   closeToTray: z.boolean().default(false),
   launchAtLogin: z.boolean().default(false),
   setupStep: z.number().int().min(0).max(8).default(0),
@@ -123,6 +128,7 @@ export type Snapshot = SavedState & {
   dataPath: string;
   appVersion: string;
   importStatus: string;
+  discordStatus?: string;
   updateStatus?: string;
   updateReady?: boolean;
   playbackGeneration?: number;

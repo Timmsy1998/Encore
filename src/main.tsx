@@ -32,6 +32,7 @@ import {
 import * as Switch from "@radix-ui/react-switch";
 import { Button } from "./components/ui/button";
 import { Playback, Cover, Provider, Timeline, artwork, time } from "./Playback";
+import { DiscordSettings } from "./DiscordSettings";
 import { SongSearch } from "./SongSearch";
 import { PlaylistLibrary } from "./PlaylistLibrary";
 import {
@@ -940,6 +941,7 @@ function App() {
                 <h2>Spotify</h2>
                 {spotifyForm}
               </section>
+              <DiscordSettings state={s} busy={busy} send={send} />
               <section className="section">
                 <h2>Request rules</h2>
                 <div className="form-grid">
