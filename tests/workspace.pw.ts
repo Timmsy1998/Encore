@@ -27,6 +27,11 @@ async function boot(page: Page, setup = false, updateReady = false) {
     window.encore = {
       snapshot: async () => state,
       searchSongs: async () => { throw Error("Provider unavailable: development test fixture."); },
+      subscribeProgress: callback => {
+        const handler = (event: Event) => callback((event as CustomEvent).detail);
+        window.addEventListener("fixture-progress", handler);
+        return () => window.removeEventListener("fixture-progress", handler);
+      },
       subscribe: (callback) => {
         callbacks.add(callback);
         return () => {
@@ -250,6 +255,9 @@ test("saved overlays have independent designs, stable URLs and persistent names"
 
 
 test("overlay gallery, vinyl, request attribution and transitions follow live playback", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.assign(window, { EventSource: class { constructor() { Object.assign(window, { overlayEvents: this }); } close() {} } });
+  });
   const model = { current: { id: "youtube001", source: "youtube", title: "First song", author: "Artist", user: "Viewer", duration: 180 }, currentLane: "listening", trackGeneration: 1, playing: true, appearance: { overlayLayout: "vertical", overlayVinyl: true }, progress: { position: 42, observedAt: Date.now(), active: false } };
   await page.route("**/now", route => route.fulfill({ json: model }));
   await page.route("**/events", route => route.fulfill({ contentType: "text/event-stream", body: "data: connected\n\n" }));
@@ -293,6 +301,7 @@ test("overlay gallery, vinyl, request attribution and transitions follow live pl
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(card.locator(".encore-art")).toHaveCSS("animation-name", "none");
   model.current.title = "Reduced motion song";
+  await page.evaluate(() => (window as unknown as { overlayEvents: { onmessage: () => void } }).overlayEvents.onmessage());
   await expect(card.locator("h1")).toHaveText("Reduced motion song");
   expect(await card.evaluate(el => el.getAnimations().length)).toBe(0);
 });
@@ -301,8 +310,8 @@ test("Canvas follows playback silently, cleans up and falls back to covers", asy
   const model = { current: { id: "youtube0001", source: "youtube", title: "Canvas song", author: "Artist", duration: 180 }, trackGeneration: 1, playing: true, appearance: { overlayCanvas: true, overlayVinyl: true, overlayHidePaused: false }, progress: { position: 42, observedAt: Date.now(), active: true } };
   await page.addInitScript(() => {
     const calls: string[] = [];
-    // Keep the fixture event stream connected; polling supplies controlled updates.
-    Object.assign(window, { EventSource: class { close() {} }, canvasCalls: calls, YT: { Player: class {
+    // Allow explicit state notifications while paused, when polling stops.
+    Object.assign(window, { EventSource: class { constructor() { Object.assign(window, { overlayEvents: this }); } close() {} }, canvasCalls: calls, YT: { Player: class {
       position = 0;
       state = -1;
       frame = document.createElement("iframe");
@@ -342,6 +351,7 @@ test("Canvas follows playback silently, cleans up and falls back to covers", asy
   model.progress.active = true;
   model.trackGeneration++;
   model.current.id = "youtube0002";
+  await page.evaluate(() => (window as unknown as { overlayEvents: { onmessage: () => void } }).overlayEvents.onmessage());
   await expect.poll(async () => (await calls()).filter(call => call.startsWith("create")).length).toBe(2);
   await expect(page.locator('[data-transition="outgoing"] iframe')).toHaveCount(0);
   await expect(page.locator("iframe")).toHaveCount(1);
@@ -566,4 +576,55 @@ test("Discord presence is opt-in with a live preview, privacy controls and valid
   await page.reload();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(section.getByRole("switch", { name: "Share music on Discord" })).toBeChecked();
+});
+
+test("progress updates playback widgets without replacing the library snapshot and ignores stale generations", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(async () => {
+    const state = await window.encore.snapshot();
+    Object.assign(state, { current: { source: "youtube", id: "abcdefghijk", title: "Progress song", author: "Artist", duration: 180 }, playing: false, playbackGeneration: 7, progress: { position: 10, observedAt: Date.now(), active: false } });
+    localStorage.setItem("fixture-state", JSON.stringify(state));
+  });
+  await page.reload();
+  const slider = page.getByRole("slider", { name: "Playback position", exact: true });
+  await expect(slider).toHaveValue("10");
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("fixture-progress", { detail: { generation: 7, position: 45, observedAt: Date.now(), active: false } })));
+  await expect(slider).toHaveValue("45");
+  expect(await page.evaluate(async () => (await window.encore.snapshot()).progress?.position)).toBe(10);
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("fixture-progress", { detail: { generation: 6, position: 170, observedAt: Date.now(), active: false } })));
+  await expect(slider).toHaveValue("45");
+});
+
+test("idle OBS stops polling and resumes through state notifications", async ({ page }) => {
+  const model = { current: null, playing: false };
+  let reads = 0;
+  await page.addInitScript(() => {
+    Object.assign(window, { EventSource: class { constructor() { Object.assign(window, { overlayEvents: this }); } close() {} } });
+  });
+  await page.route("**/now", route => { reads++; return route.fulfill({ json: model }); });
+  await page.goto("/overlay.html");
+  await expect.poll(() => reads).toBe(1);
+  await page.clock.install();
+  await page.clock.runFor(5000);
+  expect(reads).toBe(1);
+  await page.evaluate(() => (window as unknown as { overlayEvents: { onmessage: () => void } }).overlayEvents.onmessage());
+  await expect.poll(() => reads).toBe(2);
+});
+
+test("OBS retries a transient state failure then stops polling when idle", async ({ page }) => {
+  let reads = 0;
+  await page.addInitScript(() => {
+    Object.assign(window, { EventSource: class { close() {} } });
+  });
+  await page.clock.install();
+  await page.route("**/now", route => {
+    reads++;
+    return reads === 1 ? route.fulfill({ status: 503 }) : route.fulfill({ json: { current: null, playing: false } });
+  });
+  await page.goto("/overlay.html");
+  await expect.poll(() => reads).toBe(1);
+  await page.clock.runFor(5000);
+  await expect.poll(() => reads).toBe(2);
+  await page.clock.runFor(10000);
+  expect(reads).toBe(2);
 });

@@ -202,11 +202,13 @@ export const CommandSchema = z.discriminatedUnion("type", [
   }),
 ]);
 export type Command = z.infer<typeof CommandSchema>;
+export type PlaybackProgress = { generation: number; position: number; observedAt: number; active: boolean };
 export interface EncoreBridge {
   snapshot(): Promise<Snapshot>;
   searchSongs(input: string): Promise<SongSearchResult>;
   command(command: Command): Promise<void>;
   subscribe(callback: (s: Snapshot) => void): () => void;
+  subscribeProgress(callback: (sample: PlaybackProgress) => void): () => void;
 }
 declare global {
   interface Window {

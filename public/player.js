@@ -268,6 +268,20 @@ window.encoreReconnectSpotify = () => {
 };
 let updating = false,
   again = false;
+// Loading an unused provider can create an iframe, SDK workers and network traffic.
+const providerScripts = new Set();
+function loadProvider(source) {
+  if (providerScripts.has(source)) return;
+  providerScripts.add(source);
+  const script = document.createElement("script");
+  script.src = source === "youtube" ? "https://www.youtube.com/iframe_api" : "https://sdk.scdn.co/spotify-player.js";
+  script.onerror = () => {
+    providerScripts.delete(source);
+    script.remove();
+    status.textContent = "Playback service could not load. Check your connection and try again.";
+  };
+  document.head.append(script);
+}
 async function update() {
   if (updating) {
     again = true;
@@ -276,6 +290,8 @@ async function update() {
   updating = true;
   try {
     state = await post("/player-state");
+    if (state.spotifyConnected) loadProvider("spotify");
+    if (state.current?.source === "youtube") loadProvider("youtube");
     await connectSpotify();
     if (!state.spotifyConnected && spotify) {
       spotify.disconnect();
@@ -331,6 +347,7 @@ async function update() {
       "Playback connection unavailable. Check Encore diagnostics.";
   } finally {
     updating = false;
+    syncSampler();
     if (again) {
       again = false;
       void update();
@@ -343,25 +360,44 @@ stream.onerror = () => {
   status.textContent = "Reconnecting to Encore…";
 };
 // Sample local SDK state; this makes no Web API requests and detects track endings reliably.
-const sampler = setInterval(() => {
+let samplingSpotify = null;
+let sampler;
+function syncSampler() {
+  if (state?.playing && state.current) {
+    if (!sampler) sampler = setInterval(samplePlayback, 1000);
+  } else {
+    clearInterval(sampler);
+    sampler = undefined;
+  }
+}
+function samplePlayback() {
   // Retry a failed local delivery for either provider, even after Spotify pauses.
   if (pendingEnd) {
     if (pendingEnd.generation === state?.generation && state.playing) ended(pendingEnd);
     else pendingEnd = null;
   }
-  if (spotify && spotifyActive && state?.playing)
-    spotify
+  if (spotify && spotifyActive && state?.playing && samplingSpotify !== spotify) {
+    const instance = spotify;
+    samplingSpotify = instance;
+    const generation = state.generation;
+    instance
       .getCurrentState()
-      .then(observeSpotify)
-      .catch(() => report("not_ready"));
-  if (ytReady && state?.current?.source === "youtube" && yt.getVideoData().video_id === state.current.id) {
+      .then(sample => {
+        if (spotify === instance && state?.generation === generation) observeSpotify(sample);
+      })
+      .catch(() => {
+        if (spotify === instance && state?.generation === generation) return report("not_ready");
+      })
+      .finally(() => { if (samplingSpotify === instance) samplingSpotify = null; });
+  }
+  if (ytReady && state?.playing && state?.current?.source === "youtube" && yt.getVideoData().video_id === state.current.id) {
     const playbackState = yt.getPlayerState();
     observeYouTube(playbackState);
     const position = yt.getCurrentTime();
     if (Number.isFinite(position))
       void report("progress", { position, active: playbackState === 1 });
   }
-}, 1000);
+}
 window.addEventListener("beforeunload", () => {
   clearInterval(sampler);
   stream.close();

@@ -2,10 +2,11 @@ import { readFileSync } from "node:fs";
 import { createContext, runInContext } from "node:vm";
 import { expect, it, vi } from "vitest";
 
-async function player() {
+async function player(initial?: Record<string, unknown>) {
   const events: any[] = [];
   let stream: any;
   let sample!: () => void;
+  let sampling = false;
   let failedEndings = 0;
   let model: any = {
     current: { source: "youtube", id: "youtube001" },
@@ -14,7 +15,9 @@ async function player() {
     trackGeneration: 1,
     volume: 70,
     spotifyConnected: true,
+    ...initial,
   };
+  const scripts: string[] = [];
   const yt = {
     pauseVideo: vi.fn(),
     cueVideoById: vi.fn(),
@@ -44,9 +47,11 @@ async function player() {
     setTimeout,
     clearTimeout,
     Date,
-    setInterval: (callback: () => void) => { sample = callback; return 1; },
-    clearInterval: () => {},
+    setInterval: (callback: () => void) => { sampling = true; sample = callback; return 1; },
+    clearInterval: () => { sampling = false; },
     document: {
+      createElement: () => ({ src: "", remove() {} }),
+      head: { append: (script: { src: string }) => scripts.push(script.src) },
       querySelector: () => ({ textContent: "" }),
       body: { classList: { toggle: () => {} } },
     },
@@ -93,6 +98,8 @@ async function player() {
   };
   await flush();
   return {
+    scripts,
+    sampling: () => sampling,
     seek: (key: string, generation: number, position: number) => context.encoreSeek(key, generation, position),
     reconnect: () => context.encoreReconnectSpotify(),
     yt,
@@ -355,4 +362,42 @@ it("seeks only the matching provider track and generation and rejects invalid po
   expect(p.sdk.seek).toHaveBeenCalledExactlyOnceWith(42000);
   p.listeners.not_ready({ device_id: "encore-device" });
   expect(await p.seek("spotify:spotify001", 3, 42)).toBe(false);
+});
+
+it("loads no provider scripts for an empty unconnected player", async () => {
+  const p = await player({ current: null, playing: false, spotifyConnected: false });
+  expect(p.scripts).toEqual([]);
+  expect(p.sampling()).toBe(false);
+  await p.change({ current: { source: "youtube", id: "youtube001" }, playing: false, generation: 2, trackGeneration: 2 });
+  expect(p.scripts).toEqual(["https://www.youtube.com/iframe_api"]);
+  await p.change({ current: { source: "youtube", id: "youtube002" }, playing: false, generation: 3, trackGeneration: 3 });
+  expect(p.scripts).toHaveLength(1);
+});
+it("does not poll a paused YouTube player", async () => {
+  const p = await player();
+  await p.change({ current: { source: "youtube", id: "youtube001" }, playing: false, generation: 2, trackGeneration: 1 });
+  expect(p.sampling()).toBe(false);
+  p.yt.getCurrentTime.mockClear();
+  p.sample();
+  expect(p.yt.getCurrentTime).not.toHaveBeenCalled();
+});
+it("does not overlap slow Spotify state samples", async () => {
+  const p = await player();
+  await p.change({ current: { source: "spotify", id: "spotify001" }, playing: true, generation: 2, trackGeneration: 2, spotifyConnected: true });
+  p.sdk.getCurrentState.mockImplementation(() => new Promise(() => {}));
+  p.sample(); p.sample(); p.sample();
+  expect(p.sdk.getCurrentState).toHaveBeenCalledTimes(1);
+});
+
+it("discards a Spotify sample that resolves after playback generation changes", async () => {
+  const p = await player();
+  const current = { source: "spotify", id: "spotify001" };
+  await p.change({ current, playing: true, generation: 2, trackGeneration: 2, spotifyConnected: true });
+  let resolveSample!: (sample: any) => void;
+  p.sdk.getCurrentState.mockImplementation(() => new Promise(resolve => { resolveSample = resolve; }));
+  p.sample();
+  await p.change({ current, playing: true, generation: 3, trackGeneration: 2, spotifyConnected: true });
+  resolveSample({ paused: false, position: 80000, duration: 180000, track_window: { current_track: { id: current.id } } });
+  await p.flush();
+  expect(p.events.some(event => event.event === "progress" && event.position === 80)).toBe(false);
 });

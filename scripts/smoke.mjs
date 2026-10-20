@@ -44,6 +44,14 @@ try {
   const state = await window.evaluate(() => window.encore.snapshot());
   if (state.playing || state.current || state.queue.length)
     throw Error("Fresh profile must start empty and paused.");
+  // A fresh idle app must not bootstrap either provider SDK or an iframe.
+  const idleProviders = await app.evaluate(async ({ webContents }) => {
+    const player = webContents.getAllWebContents().find(contents => contents.getURL().includes("/player.html?"));
+    if (!player) throw Error("Missing playback view");
+    return player.executeJavaScript(`({ scripts: [...document.scripts].map(s => s.src), frames: document.querySelectorAll('iframe').length })`);
+  });
+  expect(idleProviders.frames).toBe(0);
+  expect(idleProviders.scripts.some(url => /youtube|scdn/.test(url))).toBe(false);
   // Streamer.bot saves must retain the active step and unrelated settings.
   await window.evaluate(() => window.encore.command({
     type: "settings", settings: { setupStep: 1, volume: 23 },

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AudioLines, Heart, ListMusic, Pause, Play, Repeat, Shuffle, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
+import { usePlaybackProgress } from "./usePlaybackProgress";
 import { Button } from "./components/ui/button";
 import { key, type Command, type Snapshot, type Track } from "./core/contracts";
 
@@ -19,11 +20,15 @@ export function Provider({ source }: { source: Track["source"] }) {
 export function Timeline({ state, send, disabled = false, compact = false }: { state: Snapshot; send: (c: Command) => Promise<boolean>; disabled?: boolean; compact?: boolean }) {
   const [now, setNow] = useState(Date.now());
   const [draft, setDraft] = useState<number | null>(null);
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(timer); }, []);
+  const sample = usePlaybackProgress(state);
+  useEffect(() => {
+    if (!state.playing || !sample?.active) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [state.playing, sample?.active]);
   useEffect(() => setDraft(null), [state.current?.id, state.playbackGeneration]);
-  const sample = state.progress;
   const duration = state.current?.duration ?? 0;
-  const position = draft ?? Math.min(duration, Math.max(0, sample ? sample.position + (state.playing && sample.active ? Math.min(3, Math.max(0, now - sample.observedAt) / 1000) : 0) : 0));
+  const position = draft ?? Math.min(duration, Math.max(0, sample ? sample.position + (state.playing && sample.active ? Math.min(3, Math.max(0, Math.max(now, sample.observedAt) - sample.observedAt) / 1000) : 0) : 0));
   const ready = !!state.current && !!sample && state.playbackGeneration !== undefined;
   const commit = () => {
     if (draft === null || !ready) return;
@@ -41,6 +46,7 @@ export function Timeline({ state, send, disabled = false, compact = false }: { s
 }
 export function Playback({ state: s, send, busy, showQueue }: { state: Snapshot; send: (c: Command) => Promise<boolean>; busy: boolean; showQueue: () => void }) {
   const [lastVolume, setLastVolume] = useState(70);
+  const progress = usePlaybackProgress(s);
   const current = s.current;
   return <footer className="playback">
     <div className="playback-title"><Cover track={current} /><div><strong>{current?.title || "Nothing playing"}</strong><small>{current?.author || "Your next track is waiting"}</small></div>
@@ -48,7 +54,7 @@ export function Playback({ state: s, send, busy, showQueue }: { state: Snapshot;
     </div>
     <div className="playback-center"><div className="transport">
       <Button variant="ghost" size="icon" aria-label="Shuffle stream playlist" aria-pressed={s.baseShuffle} disabled={!s.base.length || busy} onClick={() => send({ type: "playlistShuffle", enabled: !s.baseShuffle })}><Shuffle size={20} /></Button>
-      <Button variant="ghost" size="icon" aria-label="Restart track" disabled={!current || !s.progress || busy} onClick={() => current && s.playbackGeneration !== undefined && send({ type: "seek", key: key(current), generation: s.playbackGeneration, position: 0 })}><SkipBack size={22} /></Button>
+      <Button variant="ghost" size="icon" aria-label="Restart track" disabled={!current || !progress || busy} onClick={() => current && s.playbackGeneration !== undefined && send({ type: "seek", key: key(current), generation: s.playbackGeneration, position: 0 })}><SkipBack size={22} /></Button>
       <Button className="play-button" aria-label={s.playing ? "Pause" : "Play"} disabled={busy} size="icon" onClick={() => send({ type: s.playing ? "pause" : "play" })}>{s.playing ? <Pause size={25} fill="currentColor" /> : <Play size={25} fill="currentColor" />}</Button>
       <Button variant="ghost" size="icon" aria-label="Skip track" disabled={busy} onClick={() => send({ type: "skip" })}><SkipForward size={22} /></Button>
       <Button variant="ghost" size="icon" aria-label="Repeat stream playlist" aria-pressed={s.settings.repeatBase} disabled={busy} onClick={() => send({ type: "settings", settings: { repeatBase: !s.settings.repeatBase } })}><Repeat size={21} /></Button>

@@ -124,9 +124,10 @@ function publicState(presetId?: string) {
 }
 function emit() {
   placePlayer();
-  if (!quitting) discord?.update(snapshot());
+  const state = snapshot();
+  if (!quitting) discord?.update(state);
   if (main && !main.isDestroyed())
-    main.webContents.send("encore:state", snapshot());
+    main.webContents.send("encore:state", state);
   for (const client of clients) client.write("data: update\n\n");
 }
 function save() {
@@ -751,7 +752,9 @@ const server = createServer(async (req, res) => {
       if (data.event === "progress") {
         if (queue.current && data.key === key(queue.current) && data.generation === generation && data.position !== undefined) {
           playbackSample = { generation, position: data.position, observedAt: Date.now(), active: queue.playing && !!data.active };
-          if (main && !main.isDestroyed()) main.webContents.send("encore:state", snapshot());
+          if (main && !main.isDestroyed() && main.isVisible() && !main.isMinimized())
+            main.webContents.send("encore:progress", playbackSample);
+          if (!quitting) discord?.update(snapshot());
         }
       } else if (data.event === "ready" && data.device) {
         spotifyDevice = data.device;
@@ -906,6 +909,11 @@ function createMain() {
   void main.loadURL(origin + "/");
   showPlayer();
   main.on("resize", placePlayer);
+  const refreshWindow = () => {
+    if (main && !main.isDestroyed()) main.webContents.send("encore:state", snapshot());
+  };
+  main.on("show", refreshWindow);
+  main.on("restore", refreshWindow);
   main.on("minimize", () => {
     if (queue.current?.source === "youtube") void serial(pause);
   });

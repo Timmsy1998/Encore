@@ -44,3 +44,13 @@ Discord Rich Presence is opt-in. Main connects as a client to Discord’s native
 Installed copies use `electron-updater` with the public GitHub repository. Downloads are checked against release metadata and installed when the user chooses **Restart and install**. Update downloads run separately from playback commands. Portable copies are updated manually.
 
 Windows builds use the pinned Castlabs Electron runtime. See [releasing](RELEASE.md) for packaging and signing.
+
+## Resource use
+
+Playback positions use a small, generation-scoped IPC event. Only transport widgets and the Discord preview subscribe; the library and queue are not cloned across IPC and rendered every second. Hidden/minimised windows skip progress delivery and refresh from main when shown. Timeline clocks run once per second only while playback is active.
+
+The playback view starts without external provider scripts or iframes. YouTube loads when a YouTube track is selected; Spotify loads when an account is connected so Encore's device can register. Paused/idle playback stops the SDK sampling timer. Spotify sampling permits one outstanding call and rejects responses from an old playback generation. Active playback and failed end-event delivery retain their one-second checks. Background Spotify playback remains supported.
+
+OBS polls progress once per second during playback, stops when paused/idle, and resumes through the existing event stream. Reconnect refreshes the current state; failed state reads retry after five seconds. Requests are serialised and concurrent notifications coalesced. Provider iframes and Chromium still have a baseline memory cost; account playback, video decoding, Canvas overlays and machine hardware determine actual usage.
+
+`npm run check`, `npm run test:ui` and `npm run test:desktop` cover these behaviours, including an empty native playback view with no provider SDKs/iframes, paused polling, bounded Spotify sampling, stale progress rejection and idle overlay wakeup. Windows Task Manager measurements and long-running real-account CPU/RAM/GPU profiling remain release checks; no fixed resource budget has been verified.

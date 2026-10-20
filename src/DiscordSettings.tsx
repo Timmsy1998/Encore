@@ -1,3 +1,4 @@
+import { usePlaybackProgress } from "./usePlaybackProgress";
 import { useId, useState } from "react";
 import * as Switch from "@radix-ui/react-switch";
 import { AudioLines, ExternalLink } from "lucide-react";
@@ -14,7 +15,8 @@ export function DiscordSettings({ state, busy, send }: { state: Snapshot; busy: 
   const [id, setId] = useState<string | null>(null);
   const settings = state.settings;
   const config = (settings: Partial<Settings>) => { void send({ type: "settings", settings }); };
-  const activity = discordActivity(state);
+  const progress = usePlaybackProgress(state);
+  const activity = discordActivity({ ...state, progress });
   const validId = /^[0-9]{17,20}$/.test(id ?? settings.discordClientId);
   return <section className="section discord-section" aria-labelledby="discord-heading">
     <div className="discord-heading"><div><span className="eyebrow">SHARE THE SOUND</span><h2 id="discord-heading">Discord Rich Presence</h2></div><span className={`discord-status ${settings.discordEnabled ? "enabled" : ""}`} role="status">{state.discordStatus || (settings.discordEnabled ? "Waiting for Discord" : "Disabled")}</span></div>
