@@ -796,7 +796,7 @@ summary:focus-visible { outline: 2px solid #efbb88; outline-offset: 4px; }
 .navigation { grid-row: 1; padding: 30px 10px 10px; background: #10141780; }
 .brand { font-size: 34px; letter-spacing: -1.5px; gap: 14px; padding: 0 12px 38px; color: #f3f3f6; }
 .brand svg { color: var(--accent); width: 34px; height: 34px; }
-.navigation nav { flex: 1; gap: 5px; min-height: 0; }
+.navigation nav { flex: 1; gap: 5px; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 nav button { min-height: 49px; padding: 12px 16px; font-size: 14px; gap: 18px; color: #c1c7d6; position: relative; border-radius: 8px; }
 nav button svg { width: 23px; height: 23px; flex-shrink: 0; }
 nav button.active { background: linear-gradient(110deg, #f5b66f22, #f5b66f13); color: var(--accent); }
@@ -964,6 +964,7 @@ h1 { font-size: 32px; font-weight: 700; margin: 0 0 3px; line-height: 1.2; lette
   .volume .queue-button { display: none; }
 }
 @media (max-height: 700px) { .navigation { padding-top: 20px; } .brand { padding-bottom: 20px; } nav button { min-height: 40px; } .now-panel { padding-bottom: 18px; } }
+@media (max-height: 640px) { .navigation { padding-top: 14px; } .brand { padding-bottom: 12px; } .navigation nav { gap: 3px; } nav button { min-height: 36px; padding: 6px 8px; flex-shrink: 0; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 
 .now-panel { display: flex; flex-direction: column; overflow: hidden; }
@@ -1013,3 +1014,25 @@ h1 { font-size: 32px; font-weight: 700; margin: 0 0 3px; line-height: 1.2; lette
 .discord-empty strong { font-size:14px; }
 .discord-empty span { font-size:12px; line-height:1.6; max-width:230px; }
 @media (max-width:1100px) { .discord-layout { grid-template-columns:1fr; } .discord-preview { max-width:380px; } }
+
+/* Frameless desktop chrome: only the title strip is draggable. */
+.desktop-shell { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; background: #0e1215; }
+.desktop-shell > .app, .desktop-shell > .loading { flex: 1; min-height: 0; height: auto; }
+.window-titlebar { height: 36px; flex-shrink: 0; display: flex; align-items: stretch; background: #101519; border-bottom: 1px solid #ffffff09; user-select: none; }
+.window-drag-region { -webkit-app-region: drag; flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 0 14px; color: #cbd0d8; font-size: 12px; font-weight: 600; letter-spacing: .2px; }
+.window-drag-region > svg { color: var(--accent); }
+.window-caption { margin-left: 10px; font-size: 8px; font-weight: 500; letter-spacing: 1.8px; color: #7e8997; }
+.window-controls { -webkit-app-region: no-drag; display: flex; flex-shrink: 0; }
+.window-controls button { width: 46px; height: 35px; display: grid; place-items: center; border: 0; border-radius: 0; padding: 0; color: #b9c2cf; background: transparent; transition: background-color 120ms, color 120ms; }
+.window-controls button:hover { background: #ffffff10; color: #fff; }
+.window-controls button:active { background: #ffffff1b; }
+.window-controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.window-controls button.window-close:hover { background: #c42b3c; color: #fff; }
+.window-controls button.window-close:active { background: #a62433; }
+.window-controls svg { width: 14px; height: 14px; stroke-width: 1.5; }
+.window-controls .restore-icon { width: 13px; height: 13px; }
+.window-inactive .window-drag-region, .window-inactive .window-controls { color: #818995; }
+.window-inactive .window-drag-region > svg { opacity: .6; }
+.window-error { flex-shrink: 0; padding: 6px 14px; color: #f5b66f; background: #33291e; font-size: 12px; }
+@media (max-width: 850px) { .window-caption { display: none; } }
+@media (prefers-reduced-motion: reduce) { .window-controls button { transition: none; } }

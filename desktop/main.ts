@@ -30,6 +30,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import {
   CommandSchema,
+  WindowActionSchema,
   SongSearchInputSchema,
   SettingsSchema,
   migrate,
@@ -218,7 +219,7 @@ function placePlayer() {
     const inset = width <= 1100 ? 16 : 24;
     const size = panel - 10 - inset * 2 - 2;
     player.setVisible(queue.current?.source === "youtube");
-    player.setBounds({ x: width - panel + inset + 1, y: 84, width: size, height: size });
+    player.setBounds({ x: width - panel + inset + 1, y: 120, width: size, height: size });
   }
 }
 function showPlayer() {
@@ -861,6 +862,7 @@ const server = createServer(async (req, res) => {
   }
 });
 function createMain() {
+  Menu.setApplicationMenu(null);
   let bounds = {
     width: 1240,
     height: 840,
@@ -897,6 +899,7 @@ function createMain() {
     minWidth: 760,
     minHeight: 600,
     title: "Encore",
+    frame: false,
     backgroundColor: "#121416",
     webPreferences: {
       preload: join(__dirname, "preload.cjs"),
@@ -906,6 +909,13 @@ function createMain() {
     },
   });
   windowSecurity(main, origin + "/");
+  const emitWindow = () => {
+    if (main && !main.isDestroyed()) main.webContents.send("encore:windowState", { maximized: main.isMaximized(), focused: main.isFocused() });
+  };
+  main.on("maximize", emitWindow);
+  main.on("unmaximize", emitWindow);
+  main.on("focus", emitWindow);
+  main.on("blur", emitWindow);
   void main.loadURL(origin + "/");
   showPlayer();
   main.on("resize", placePlayer);
@@ -1042,6 +1052,21 @@ if (!app.requestSingleInstanceLock()) {
         )
           throw Error("Untrusted sender");
         return snapshot();
+      });
+      ipcMain.handle("encore:windowState", e => {
+        if (!trustedFrame(e.senderFrame?.url ?? "", e.senderFrame === main?.webContents.mainFrame))
+          throw Error("Untrusted sender");
+        return { maximized: main!.isMaximized(), focused: main!.isFocused() };
+      });
+      ipcMain.handle("encore:windowAction", (e, input) => {
+        if (!trustedFrame(e.senderFrame?.url ?? "", e.senderFrame === main?.webContents.mainFrame))
+          throw Error("Untrusted sender");
+        const action = WindowActionSchema.parse(input);
+        if (action === "minimize") main!.minimize();
+        else if (action === "toggleMaximize") {
+          if (main!.isMaximized()) main!.unmaximize();
+          else main!.maximize();
+        } else main!.close();
       });
       ipcMain.handle("encore:searchSongs", async (e, input) => {
         if (!trustedFrame(e.senderFrame?.url ?? "", e.senderFrame === main?.webContents.mainFrame))

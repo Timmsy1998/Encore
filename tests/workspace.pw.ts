@@ -25,6 +25,13 @@ async function boot(page: Page, setup = false, updateReady = false) {
       JSON.parse(localStorage.getItem("fixture-state") || "null") || initial;
     const callbacks = new Set<(state: Snapshot) => void>();
     window.encore = {
+      windowState: async () => ({ maximized: false, focused: true }),
+      windowAction: async action => { window.dispatchEvent(new CustomEvent("fixture-window-action", { detail: action })); },
+      subscribeWindow: callback => {
+        const handler = (event: Event) => callback((event as CustomEvent).detail);
+        window.addEventListener("fixture-window-state", handler);
+        return () => window.removeEventListener("fixture-window-state", handler);
+      },
       snapshot: async () => state,
       searchSongs: async () => { throw Error("Provider unavailable: development test fixture."); },
       subscribeProgress: callback => {
@@ -627,4 +634,24 @@ test("OBS retries a transient state failure then stops polling when idle", async
   await expect.poll(() => reads).toBe(2);
   await page.clock.runFor(10000);
   expect(reads).toBe(2);
+});
+
+test("custom chrome sends window actions and follows native maximise state", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    const actions: string[] = [];
+    Object.assign(window, { windowActions: actions });
+    window.addEventListener("fixture-window-action", event => actions.push((event as CustomEvent).detail));
+  });
+  const controls = page.getByRole("group", { name: "Window controls" });
+  await controls.getByRole("button", { name: "Minimise window" }).click();
+  await controls.getByRole("button", { name: "Maximise window" }).click();
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("fixture-window-state", { detail: { maximized: true, focused: true } })));
+  await controls.getByRole("button", { name: "Restore window" }).click();
+  await controls.getByRole("button", { name: "Close window" }).click();
+  expect(await page.evaluate(() => (window as unknown as { windowActions: string[] }).windowActions)).toEqual(["minimize", "toggleMaximize", "toggleMaximize", "close"]);
+  const drag = page.locator(".window-drag-region");
+  expect(await drag.evaluate(el => getComputedStyle(el).getPropertyValue("-webkit-app-region"))).toBe("drag");
+  expect(await controls.evaluate(el => getComputedStyle(el).getPropertyValue("-webkit-app-region"))).toBe("no-drag");
+  expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
 });

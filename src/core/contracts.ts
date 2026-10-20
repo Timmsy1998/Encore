@@ -203,7 +203,13 @@ export const CommandSchema = z.discriminatedUnion("type", [
 ]);
 export type Command = z.infer<typeof CommandSchema>;
 export type PlaybackProgress = { generation: number; position: number; observedAt: number; active: boolean };
+export type WindowState = { maximized: boolean; focused: boolean };
+export const WindowActionSchema = z.enum(["minimize", "toggleMaximize", "close"]);
+export type WindowAction = z.infer<typeof WindowActionSchema>;
 export interface EncoreBridge {
+  windowState(): Promise<WindowState>;
+  windowAction(action: WindowAction): Promise<void>;
+  subscribeWindow(callback: (state: WindowState) => void): () => void;
   snapshot(): Promise<Snapshot>;
   searchSongs(input: string): Promise<SongSearchResult>;
   command(command: Command): Promise<void>;

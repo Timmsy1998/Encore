@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { Command, EncoreBridge, PlaybackProgress, Snapshot } from "../src/core/contracts";
 const bridge: EncoreBridge = {
+  windowState: () => ipcRenderer.invoke("encore:windowState"),
+  windowAction: action => ipcRenderer.invoke("encore:windowAction", action),
+  subscribeWindow: callback => {
+    const handler = (_event: unknown, state: Parameters<typeof callback>[0]) => callback(state);
+    ipcRenderer.on("encore:windowState", handler);
+    return () => ipcRenderer.removeListener("encore:windowState", handler);
+  },
   searchSongs: (input: string) => ipcRenderer.invoke("encore:searchSongs", input),
   snapshot: () => ipcRenderer.invoke("encore:snapshot"),
   command: (c: Command) => ipcRenderer.invoke("encore:command", c),

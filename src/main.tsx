@@ -33,6 +33,7 @@ import * as Switch from "@radix-ui/react-switch";
 import { Button } from "./components/ui/button";
 import { Playback, Cover, Provider, Timeline, artwork, time } from "./Playback";
 import { DiscordSettings } from "./DiscordSettings";
+import { WindowChrome } from "./WindowChrome";
 import { SongSearch } from "./SongSearch";
 import { PlaylistLibrary } from "./PlaylistLibrary";
 import {
@@ -1147,6 +1148,6 @@ function App() {
 }
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <WindowChrome><App /></WindowChrome>
   </StrictMode>,
 );

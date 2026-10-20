@@ -29,6 +29,8 @@ Settings use a versioned schema and atomic writes. Invalid or unsupported files 
 
 The interface runs with Node disabled, sandboxing enabled and context isolation enabled. The preload exposes named operations; main validates their payloads and sender. Navigation, popups and external links are restricted.
 
+The desktop window has a custom draggable title bar and no native application menu. Its labelled minimise, maximise/restore and close controls use narrowly scoped IPC with validated actions and the trusted main-frame check. Main publishes focus/maximise changes through events, without polling. Close follows the existing close-to-tray setting. The playback view is positioned below the title bar; compact navigation keeps controls reachable at the minimum window size. Native Windows dragging, snapping, resizing and display scaling remain release checks.
+
 Spotify and YouTube run in a separate sandboxed `WebContentsView` without the app's preload. Spotify commands target Encore's SDK device. Provider tokens aren't sent to the React interface or OBS.
 
 The local server listens at `127.0.0.1:17843`. It checks the Host header, routes, origins and request sizes. Overlay routes expose current-track information only. Player control endpoints require a random per-process bearer token. Spotify login uses PKCE and expiring, one-use state.

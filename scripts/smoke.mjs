@@ -44,6 +44,17 @@ try {
   const state = await window.evaluate(() => window.encore.snapshot());
   if (state.playing || state.current || state.queue.length)
     throw Error("Fresh profile must start empty and paused.");
+  expect(await app.evaluate(({ Menu }) => Menu.getApplicationMenu())).toBe(null);
+  await expect(window.getByRole("group", { name: "Window controls" })).toBeVisible();
+  // Check the real IPC boundary and preserve the close-to-tray behaviour.
+  expect(await window.evaluate(async () => {
+    try { await window.encore.windowAction("invalid"); return false; } catch { return true; }
+  })).toBe(true);
+  await window.evaluate(() => window.encore.command({ type: "settings", settings: { closeToTray: true } }));
+  await window.getByRole("button", { name: "Close window", exact: true }).click();
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(false);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].show());
+  await window.evaluate(() => window.encore.command({ type: "settings", settings: { closeToTray: false } }));
   // A fresh idle app must not bootstrap either provider SDK or an iframe.
   const idleProviders = await app.evaluate(async ({ webContents }) => {
     const player = webContents.getAllWebContents().find(contents => contents.getURL().includes("/player.html?"));

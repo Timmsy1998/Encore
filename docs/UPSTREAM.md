@@ -30,6 +30,7 @@ For Encore's automatic Spotify-first chat search, actions must send the song-and
 | In-app song search | Explicit result picker across Spotify and YouTube, platform labels and partial-provider failure warnings; chat keeps automatic matching |
 | Queue ordering | Queue / Up Next includes lane filters, search, requester details, action menus and a persistent next-track preview; request ordering uses drag handles or move buttons |
 | Playback workspace | Persistent player panel and transport with provider progress, seek, restart, skip, favourite, mute, stream shuffle and repeat |
+| Desktop window | Custom draggable title bar with minimise, maximise/restore and close controls; no native menu bar; respects close-to-tray (Windows snapping/scaling verification remains unverified) |
 | Skip votes | One vote per viewer |
 | Wrong song | Removes the viewer's last pending request |
 | Bans, favourites and history | Saved between sessions; history keeps up to 1,000 songs |
